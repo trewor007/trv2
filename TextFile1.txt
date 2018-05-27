@@ -1,0 +1,6 @@
+Autotrader 0.0.4
+	
+	Bug Found:
+		-ticker zapisuje 10 razy identyczn¹ wiadomoœæ(nale¿y uzale¿niæ zapis od nowej wiadomoœæi) #naprawiono
+		-heartbeat zapisuje identyczne wiadomoœæi (nale¿y uzupe³niæ zapis od nowej wiadomoœæi)
+		-
