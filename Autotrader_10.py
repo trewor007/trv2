@@ -93,8 +93,6 @@ class Websocket():
                 print('{} Error :{}'.format(time.ctime(), e))   
             time.sleep(0.5)     
             self.wiadomosc(dane)
-
-
     def wiadomosc(self, dane):
         if self.bd_bot==1:
            if self.kanaly==None: 
@@ -169,9 +167,14 @@ class Bots():
             #weights=np.repeat(1.0, zakres)/zakres
             weights=np.ones((zakres,))/zakres
             smas=np.convolve(self.lista, weights, 'valid')
-            print(smas)
-            #print('=====================================================================')
-            #print(len(self.lista))
+            print(smas[-1])
+            if len(self.lista)>zakres:
+                if lista[-1]>smas[-1]:
+                    print("sprzedaje")
+                if lista[-1]<smas[-1]:
+                    print('kupuje')
+                else:
+                    print9('wait')                    
         else:
             pass  
 
