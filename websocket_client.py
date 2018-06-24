@@ -14,7 +14,7 @@ import time
 from threading import Thread
 from websocket import create_connection, WebSocketConnectionClosedException
 from pymongo import MongoClient
-#from gdax.gdax_auth import get_auth_headers
+from gdax.gdax_auth import get_auth_headers
 
 
 class WebsocketClient(object):

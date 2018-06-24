@@ -10,12 +10,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib import style
-from websocket import create_connection, WebSocketConnectionClosedException, WebSocketBadStatusException, WebSocketException
+from websocket import create_connection, WebSocketConnectionClosedException
 
 conn=sqlite3.connect('bazadanych.db')
-c = conn.cursor()
+c = conn.cursor()                           
 
-
+      
 class Websocket():
 
     def __init__(self, wsurl="wss://ws-feed.gdax.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}, bd_bot=1):
@@ -27,8 +27,9 @@ class Websocket():
         self.newdict=newdict
         self.kanaly=kanaly
         self.bd_bot=bd_bot
+        print(self.wsurl)
         print(self.produkty)
-    def KonektorWebsocketSubskribe(self, dane):
+    def KonektorWebsocketSubskribe(self, dane):                                       
         b=['type', 'side', 'price', 'time', 'order_id', 'product_id', 'order_type', 'size', 'reason', 'remaining_size', 'client_oid', 'sequence']
         i=0
         while i<len(b):
@@ -39,7 +40,7 @@ class Websocket():
     def KonektorWebsocketTicker(self, dane):
         b=['type', 'sequence', 'product_id', 'price', 'open_24h', 'volume_24h', 'low_24h', 'high_24h', 'volume_30d', 'best_bid', 'best_ask', 'side', 'time', 'trade_id', 'last_size']
         i=0
-        typtranzakcji=dane.get('type',None)
+        typtranzakcji=dane.get('type',None)      
         if typtranzakcji=='ticker':
             while i<len(b):
                 a = eval("dane.get('" + b[i] + "', None)")
@@ -50,7 +51,7 @@ class Websocket():
         b=['type', 'product_id', 'time', 'bids', 'asks', 'changes']
         i=0
         typtranzakcji=dane.get('type',None)
-        if (typtranzakcji=='snapshot' or typtranzakcji=='l2update'):
+        if (typtranzakcji=='snapshot' or typtranzakcji=='l2update'):        
             while i<len(b):
                 a = eval("dane.get('" + b[i] + "', None)")
                 self.newdict[b[i]]=a
@@ -67,38 +68,34 @@ class Websocket():
     def tabelaKreacja():                        #tworzenie tabeli // nie używane nigdzie w programie sprawdzić funkcje CREATE TABLE IF NOT EXISTS i wstawienia bezpośrednio do programu( nie w pętli)
         c.execute("CREATE TABLE IF NOT EXISTS tabelka(ID NUMERIC, Dane TEXT,)") # nawias wywala błąd
         pass
-    def _Polacz(self):
-        self.ws=create_connection(self.wsurl, timeout=180)
+    def Polacz(self):
+        self.ws=create_connection(self.wsurl)
 
         if self.kanaly is None:
             self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty}))
         else:
             self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty, 'channels': [{"name": self.kanaly, 'product_ids': self.produkty,}]}))    #wysłanie subskrybcji
         self.Nasluch()
-    def Nasluch(self):
+    def Nasluch(self):    
         while True:
             try:
                 if (time.time() - self.ping_start) >= 20:
-                    self.ws.ping()
+                    self.ws.ping("ping")
+                    print('%s ping' % time.ctime())
                     self.ping_start = time.time()
                 dane=json.loads(self.ws.recv())
             except WebSocketConnectionClosedException as e:
-                self.on_error(e)
-            except WebSocketBadStatusException as e:
-                self.on_error(e)
+                print('{} Error :{} [Reconecting]'.format(time.ctime(), e))
+                self.Polacz()
             except ValueError as e:
-                self.on_error(e)
+                print('{} Error :{}'.format(time.ctime(), e))
             except Exception as e:
-                self.on_error(e)
+                print('{} Error :{}'.format(time.ctime(), e))   
+            time.sleep(0.5)     
             self.wiadomosc(dane)
-    def on_error(self, e):
-        with open('error.txt','a') as txt_file:
-            print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
-        time.sleep(0.4)
-        self._Polacz()
     def wiadomosc(self, dane):
         if self.bd_bot==1:
-           if self.kanaly==None:
+           if self.kanaly==None: 
                 self.KonektorWebsocketSubskribe(dane=dane)
            elif self.kanaly=="heartbeat":
                 self.KonektorWebsocketHeartbeat(dane=dane)
@@ -111,7 +108,7 @@ class Websocket():
             bot=Bots()
             bot.Adria(dane=dane)
 class Requester():
-    def __init__(self, url='https://api.gdax.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
+    def __init__(self, url='https://api.gdax.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None ):
         self.url = url.rstrip('/')
         self.timeout = timeout
         self.produkty= produkty
@@ -131,12 +128,12 @@ class Requester():
                 self.end=self.start+(x*self.skala)
                 self.Historic_rates()
             else:
-                self.end=self.end_tmp
-                self.Historic_rates()
+                self.end=self.end_tmp  
+                self.Historic_rates()                
         else:
                 self.Historic_rates()
     def Historic_rates(self):
-        parametry={}
+        parametry={}       
         start=datetime.datetime.fromtimestamp(self.start)
         print(start)
         end=datetime.datetime.fromtimestamp(self.end)
@@ -160,74 +157,34 @@ class Requester():
             i=i+1
         conn.commit()
 class Bots():
-    def __init__(self, cena=[], czas=[]):
-        self.cena=cena
-        self.czas=czas
+    def __init__(self, lista=[]):
+        self.lista=lista
     def Adria(self, dane):
         a=dane.get('price', None)
-        t=dane.get('time', None)
-        zakres=int(20)
-        zakres2=int(40)
-        zakres3=int(60)
-        zakres4=int(120)
+        zakres=int(30)
         if a is not None:
-            self.cena.append(float(a))
-            self.czas.append(t)
-            if len(self.cena)>zakres:
-                weights=np.ones((zakres,))/zakres
-                smas=np.convolve(self.cena, weights, 'valid')
-
-                weights_ema = np.exp(np.linspace(-1.,0.,zakres))
-                weights_ema /= weights_ema.sum()
-                ema=np.convolve(self.cena,weights_ema)[:len(self.cena)]
-                ema[:zakres]=ema[zakres]
-
-                if len(self.cena)<zakres2:
-                    print('smas: {} ema: {} '.format(smas[-1],ema[-1]))
-
-            if len(self.cena)>zakres2:
-
-                weights_ema2 = np.exp(np.linspace(-1.,0.,zakres2))
-                weights_ema2 /= weights_ema2.sum()
-                ema2=np.convolve(self.cena,weights_ema2)[:len(self.cena)]
-                ema2[:zakres2]=ema[zakres2]
-
-                if len(self.cena)<zakres3:
-                    print('smas: {} ema: {} ema2: {} '.format(smas[-1],ema[-1],ema2[-1]))
-
-            if len(self.cena)>zakres3:
-
-                weights_ema3 = np.exp(np.linspace(-1.,0.,zakres3))
-                weights_ema3 /= weights_ema3.sum()
-                ema3=np.convolve(self.cena,weights_ema3)[:len(self.cena)]
-                ema3[:zakres3]=ema[zakres3]
-                if len(self.cena)<zakres4:
-                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(smas[-1],ema[-1],ema2[-1],ema3[-1]))
-
-            if len(self.cena)>zakres4:
-
-                weights_ema4 = np.exp(np.linspace(-1.,0.,zakres4))
-                weights_ema4 /= weights_ema4.sum()
-                ema4=np.convolve(self.cena,weights_ema4)[:len(self.cena)]
-                ema4[:zakres4]=ema[zakres4]
-
-                print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(smas[-1],ema[-1],ema2[-1],ema3[-1],ema4[-1]))
-            #
-            #    if self.cena[-1]>smas[-1]:
-            #        print("sprzedaje")
-            #    if self.cena[-1]<smas[-1]:
-            #        print('kupuje')
-            #    else:
-            #        print('wait')
+            self.lista.append(float(a))
+            #weights=np.repeat(1.0, zakres)/zakres
+            weights=np.ones((zakres,))/zakres
+            smas=np.convolve(self.lista, weights, 'valid')
+            print(smas[-1])
+            if len(self.lista)>zakres:
+                if lista[-1]>smas[-1]:
+                    print("sprzedaje")
+                if lista[-1]<smas[-1]:
+                    print('kupuje')
+                else:
+                    print9('wait')                    
         else:
-            pass
+            pass  
 
 
 class Autotrader():
     print("zapisywanie do bazy danych czy uzyte przez bota? ")
     bd_bot=int(input("[1 Baza danych] [2 Adria]"))
+    
     print("Podaj pare walut ktore chcesz wykorzystac")
-    a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] [5 ETH-BTC] [6 BCH-BTC] [7 BCH-EUR]"))
+    a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] "))
     if a==1:
         produkty=["BTC-EUR"]
     elif a==2:
@@ -236,35 +193,27 @@ class Autotrader():
         produkty=["LTC-BTC"]
     elif a==4:
         produkty=["ETH-EUR"]
-    elif a==5:
-        produkty=["ETH-BTC"]
-    elif a==6:
-        produkty=["BCH-BTC"]
-    elif a==7:
-        produkty=["BCH-EUR"]
-    if bd_bot==1:
-        b=input("[1 Websocket] [2 Historic rates] ")
-        if b=='1':
-            d=int(input("[1 subskribe] [2 heartbit] [3 ticker] [4 Level2] "))
 
-            if d == 1:
-                kanaly =None
-            elif d == 2:
-                kanaly= "heartbeat"
-            elif d == 3:
-                kanaly=["ticker"]
-            elif d == 4:
-                kanaly="level2"
-            else:
-                print('ERROR:WRONG ARGUMENT! (c)=', c)
-            webs=Websocket(produkty=produkty, kanaly=kanaly, bd_bot=bd_bot)
-            webs._Polacz()
-        elif b=='2':
-            start=time.mktime(time.strptime(input("podaj Poczatek   [dd-mm-rrrr hh:mm] "), '%d-%m-%Y %H:%M'))
-            end=time.mktime(time.strptime(input("podaj Koniec   [dd-mm-rrrr hh:mm] "), '%d-%m-%Y %H:%M'))
-            skala=int(input("podaj rozdzielczosc [60, 300, 900, 3600, 21600, 86400]"))
-            webr=Requester(produkty=produkty, start=start, end=end, skala=skala, bd_bot=bd_bot)
-            webr.Historic_rates_divider()
-    elif bd_bot==2:
-        webs=Websocket(produkty=produkty, kanaly=['ticker'], bd_bot=bd_bot)
-        webs._Polacz()
+    b=input("[1 Websocket] [2 Historic rates] ")
+    if b=='1':
+        d=int(input("[1 subskribe] [2 heartbit] [3 ticker] [4 Level2] "))
+
+        if d == 1:
+            kanaly =None
+        elif d == 2:
+            kanaly= "heartbeat"
+        elif d == 3:
+            kanaly=["ticker"]
+        elif d == 4:
+            kanaly="level2"
+        else:
+            print('ERROR:WRONG ARGUMENT! (c)=', c)
+        webs=Websocket(produkty=produkty, kanaly=kanaly, bd_bot=bd_bot)
+        webs.Polacz()        
+    elif b=='2':
+        start=time.mktime(time.strptime(input("podaj Poczatek   [dd-mm-rrrr hh:mm] "), '%d-%m-%Y %H:%M')) 
+        end=time.mktime(time.strptime(input("podaj Koniec   [dd-mm-rrrr hh:mm] "), '%d-%m-%Y %H:%M')) 
+        skala=int(input("podaj rozdzielczosc [60, 300, 900, 3600, 21600, 86400]"))
+        webr=Requester(produkty=produkty, start=start, end=end, skala=skala, bd_bot=bd_bot)
+        webr.Historic_rates_divider() 
+ 
