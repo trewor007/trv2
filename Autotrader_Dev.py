@@ -105,7 +105,7 @@ class Websocket():
            conn.commit()
         elif self.bd_bot==2:
             bot=Bots()
-            bot.Adria(dane=dane)
+            bot.Adria(dane=dane, smas=[])
 class Requester():
     def __init__(self, url='https://api.gdax.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
@@ -169,10 +169,10 @@ class StockIndicators():
         ema[:zakres]=ema[zakres]
         return ema
 class Bots():
-    def __init__(self, cena=[], czas=[]):
+    def __init__(self, cena=[], czas=[], smas=[]):
         self.cena=cena
         self.czas=czas
-    def Adria(self, dane):
+    def Adria(self, dane, smas):
         a=dane.get('price', None)
         t=dane.get('time', None)
         zakres=int(20)
@@ -183,44 +183,25 @@ class Bots():
             self.cena.append(float(a))
             self.czas.append(t)
             if len(self.cena)>zakres:
-                weights=np.ones((zakres,))/zakres
-                smas=np.convolve(self.cena, weights, 'valid')
-
-                weights_ema = np.exp(np.linspace(-1.,0.,zakres))
-                weights_ema /= weights_ema.sum()
-                ema=np.convolve(self.cena,weights_ema)[:len(self.cena)]
-                ema[:zakres]=ema[zakres]
-
+                Si=StockIndicators()
+                smas=Si.SI_sma(cena=self.cena, zakres=zakres)                
+                ema=Si.SI_ema(cena=self.cena, zakres=zakres)
                 if len(self.cena)<zakres2:
-                    print('smas: {} ema: {} '.format(smas[-1],ema[-1]))
+                    print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
 
             if len(self.cena)>zakres2:
-
-                weights_ema2 = np.exp(np.linspace(-1.,0.,zakres2))
-                weights_ema2 /= weights_ema2.sum()
-                ema2=np.convolve(self.cena,weights_ema2)[:len(self.cena)]
-                ema2[:zakres2]=ema[zakres2]
-
+                ema2=Si.SI_ema(cena=self.cena, zakres=zakres2)
                 if len(self.cena)<zakres3:
-                    print('smas: {} ema: {} ema2: {} '.format(smas[-1],ema[-1],ema2[-1]))
+                    print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),ema2[-1]))
 
             if len(self.cena)>zakres3:
-
-                weights_ema3 = np.exp(np.linspace(-1.,0.,zakres3))
-                weights_ema3 /= weights_ema3.sum()
-                ema3=np.convolve(self.cena,weights_ema3)[:len(self.cena)]
-                ema3[:zakres3]=ema[zakres3]
+                ema3=Si.SI_ema(cena=self.cena, zakres=zakres3)
                 if len(self.cena)<zakres4:
-                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(smas[-1],ema[-1],ema2[-1],ema3[-1]))
+                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))
 
             if len(self.cena)>zakres4:
-
-                weights_ema4 = np.exp(np.linspace(-1.,0.,zakres4))
-                weights_ema4 /= weights_ema4.sum()
-                ema4=np.convolve(self.cena,weights_ema4)[:len(self.cena)]
-                ema4[:zakres4]=ema[zakres4]
-
-                print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(smas[-1],ema[-1],ema2[-1],ema3[-1],ema4[-1]))
+                ema4=Si.SI_ema(cena=self.cena, zakres=zakres4)
+                print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema[-1],6),round(ema4[-1],6)))
             #
             #    if self.cena[-1]>smas[-1]:
             #        print("sprzedaje")
@@ -236,7 +217,7 @@ class Autotrader():
     print("zapisywanie do bazy danych czy uzyte przez bota? ")
     bd_bot=int(input("[1 Baza danych] [2 Adria]"))
     print("Podaj pare walut ktore chcesz wykorzystac")
-    a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] "))
+    a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] [5 ETH-BTC] [6 BCH-BTC] [7 BCH-EUR]"))
     if a==1:
         produkty=["BTC-EUR"]
     elif a==2:
@@ -247,6 +228,10 @@ class Autotrader():
         produkty=["ETH-EUR"]
     elif a==5:
         produkty=["ETH-BTC"]
+    elif a==6:
+        produkty=["BCH-BTC"]
+    elif a==7:
+        produkty=["BCH-EUR"]
     if bd_bot==1:
         conn=sqlite3.connect('bazadanych.db')
         c = conn.cursor()
