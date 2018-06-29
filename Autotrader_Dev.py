@@ -12,6 +12,8 @@ import matplotlib.animation as animation
 from matplotlib import style
 from websocket import create_connection, WebSocketConnectionClosedException, WebSocketBadStatusException, WebSocketException
 
+conn=sqlite3.connect('bazadanych.db')
+c = conn.cursor()
 class Websocket():
 
     def __init__(self, wsurl="wss://ws-feed.gdax.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}, bd_bot=1):
@@ -161,12 +163,14 @@ class StockIndicators():
         weights=np.ones((zakres,))/zakres
         smas=np.convolve(self.cena, weights, 'valid')
         return smas
+        
     def SI_ema(self, cena, zakres):
         self.cena=cena
         weights_ema = np.exp(np.linspace(-1.,0.,zakres))
         weights_ema /= weights_ema.sum()
         ema=np.convolve(self.cena,weights_ema)[:len(self.cena)]
         ema[:zakres]=ema[zakres]
+
         return ema
 class Bots():
     def __init__(self, cena=[], czas=[], smas=[]):
@@ -184,24 +188,33 @@ class Bots():
             self.czas.append(t)
             if len(self.cena)>zakres:
                 Si=StockIndicators()
-                smas=Si.SI_sma(cena=self.cena, zakres=zakres)                
+                smas=Si.SI_sma(cena=self.cena, zakres=zakres)                 
                 ema=Si.SI_ema(cena=self.cena, zakres=zakres)
-                diff=np.around((smas[-1])-(ema[-1]),6)
+                diff=np.subtract(smas[-1],ema[-1])
+                #diff=(smas[-1])-(ema[-1])
+
 
                 if len(self.cena)<=zakres2:
                     print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
-                    print('smas/ema:{}'.format(diff))                 
+                    print('smas/ema:{:.6f}'.format(diff))
+
             if len(self.cena)>zakres2:
                 ema2=Si.SI_ema(cena=self.cena, zakres=zakres2)
+                diff2=((ema[-1])-(ema2[-1]))
                 if len(self.cena)<=zakres3:
-                    print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6)))                    
+                    print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6)))
+                    print('smas/ema:{:.6f} ema/ema2:{:.6f}'.format(diff,diff2))               
             if len(self.cena)>zakres3:
                 ema3=Si.SI_ema(cena=self.cena, zakres=zakres3)
+                diff3=((ema2[-1])-(ema3[-1]))
                 if len(self.cena)<=zakres4:
-                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))                    
+                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))
+                    print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f}'.format(diff,diff2,diff3))
             if len(self.cena)>zakres4:
                 ema4=Si.SI_ema(cena=self.cena, zakres=zakres4)
+                diff4=((ema3[-1])-(ema4[-1]))
                 print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6),round(ema4[-1],6)))
+                print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f} ema3/ema4:{:.6f}'.format(diff,diff2,diff3,diff4))
             #
             #    if self.cena[-1]>smas[-1]:
             #        print("sprzedaje")
