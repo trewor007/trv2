@@ -16,7 +16,7 @@ conn=sqlite3.connect('bazadanych.db')
 c = conn.cursor()
 class Websocket():
 
-    def __init__(self, wsurl="wss://ws-feed.gdax.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}, bd_bot=1):
+    def __init__(self, wsurl="wss://ws-feed.pro.coinbase.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}, bd_bot=1):
         self.wsurl = wsurl
         self.ws = None
         self.dane=dane
@@ -109,7 +109,7 @@ class Websocket():
             bot=Bots()
             bot.Adria(dane=dane, smas=[])
 class Requester():
-    def __init__(self, url='https://api.gdax.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
+    def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
         self.timeout = timeout
         self.produkty= produkty
@@ -246,8 +246,6 @@ class Autotrader():
     elif a==7:
         produkty=["BCH-EUR"]
     if bd_bot==1:
-        conn=sqlite3.connect('bazadanych.db')
-        c = conn.cursor()
         b=input("[1 Websocket] [2 Historic rates] ")
         if b=='1':
             d=int(input("[1 subskribe] [2 heartbit] [3 ticker] [4 Level2] "))
