@@ -9,11 +9,14 @@ import requests
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from threading import Thread
 from matplotlib import style
 from websocket import create_connection, WebSocketConnectionClosedException, WebSocketBadStatusException, WebSocketException
 
 conn=sqlite3.connect('bazadanych.db')
 c = conn.cursor()
+
+
 class Websocket():
 
     def __init__(self, wsurl="wss://ws-feed.pro.coinbase.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}, bd_bot=1):
@@ -65,6 +68,15 @@ class Websocket():
     def tabelaKreacja():                        #tworzenie tabeli // nie używane nigdzie w programie sprawdzić funkcje CREATE TABLE IF NOT EXISTS i wstawienia bezpośrednio do programu( nie w pętli)
         c.execute("CREATE TABLE IF NOT EXISTS tabelka(ID NUMERIC, Dane TEXT,)") # nawias wywala błąd
         pass
+    def start(self):
+        def _go():
+            self._Polacz()
+            self._Nasluch()
+            self._Rozlacz()
+        self.stop=False
+        self.thread=Thread(target=_go)
+        self.thread.start()
+
     def _Polacz(self):
         self.ws=create_connection(self.wsurl, timeout=180)
 
@@ -72,28 +84,42 @@ class Websocket():
             self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty}))
         else:
             self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty, 'channels': [{"name": self.kanaly, 'product_ids': self.produkty,}]}))    #wysłanie subskrybcji
-        self._Nasluch()
     def _Nasluch(self):
-        while True:
+        while not self.stop:
             try:
                 if (time.time() - self.ping_start) >= 20:
                     self.ws.ping()
                     self.ping_start = time.time()
                 dane=json.loads(self.ws.recv())
-            except WebSocketConnectionClosedException as e:
-                self.on_error(e)
-            except WebSocketBadStatusException as e:
-                self.on_error(e)
             except ValueError as e:
                 self.on_error(e)
             except Exception as e:
                 self.on_error(e)
-            self.wiadomosc(dane)
+            else:
+                self.wiadomosc(dane)
+
+    def _Rozlacz(self):
+        try:
+            if self.ws:
+                self.ws.close()
+        except WebSocketConnectionClosedException as e:
+            pass
+        self.on_close()
+
+    def close(self):
+        self.stop= True
+        self.thread.join()
+
+
+    def on_close(self):
+        if self.should_print:
+            print("\n-- Socket Closed --")
+            
     def on_error(self, e):
         with open('error.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
         time.sleep(0.4)
-        self._Polacz()
+        self.start()
     def wiadomosc(self, dane):
         if self.bd_bot==1:
            if self.kanaly==None:
@@ -193,7 +219,6 @@ class Bots():
                 diff=np.subtract(smas[-1],ema[-1])
                 #diff=(smas[-1])-(ema[-1])
 
-
                 if len(self.cena)<=zakres2:
                     print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
                     print('smas/ema:{:.6f}'.format(diff))
@@ -203,13 +228,15 @@ class Bots():
                 diff2=((ema[-1])-(ema2[-1]))
                 if len(self.cena)<=zakres3:
                     print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6)))
-                    print('smas/ema:{:.6f} ema/ema2:{:.6f}'.format(diff,diff2))               
+                    print('smas/ema:{:.6f} ema/ema2:{:.6f}'.format(diff,diff2))    
+
             if len(self.cena)>zakres3:
                 ema3=Si.SI_ema(cena=self.cena, zakres=zakres3)
                 diff3=((ema2[-1])-(ema3[-1]))
                 if len(self.cena)<=zakres4:
                     print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))
                     print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f}'.format(diff,diff2,diff3))
+
             if len(self.cena)>zakres4:
                 ema4=Si.SI_ema(cena=self.cena, zakres=zakres4)
                 diff4=((ema3[-1])-(ema4[-1]))
@@ -270,4 +297,4 @@ class Autotrader():
             webr.Historic_rates_divider()
     elif bd_bot==2:
         webs=Websocket(produkty=produkty, kanaly=['ticker'], bd_bot=bd_bot)
-        webs._Polacz()
+        webs.start()
