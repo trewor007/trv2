@@ -7,17 +7,14 @@ import timeit
 import urllib.request
 import requests
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from threading import Thread
-from matplotlib import style
-from websocket import create_connection, WebSocketConnectionClosedException, WebSocketBadStatusException, WebSocketException
+import threading as Thread
+from websocket import create_connection, WebSocketConnectionClosedException
 
 conn=sqlite3.connect('bazadanych.db')
 c = conn.cursor()
 
 
-class Websocket():
+class MyWebsocket(object):
 
     def __init__(self, wsurl="wss://ws-feed.pro.coinbase.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}, bd_bot=1):
         self.wsurl = wsurl
@@ -28,7 +25,7 @@ class Websocket():
         self.newdict=newdict
         self.kanaly=kanaly
         self.bd_bot=bd_bot
-        print(self.produkty)
+
     def KonektorWebsocketSubskribe(self, dane):
         b=['type', 'side', 'price', 'time', 'order_id', 'product_id', 'order_type', 'size', 'reason', 'remaining_size', 'client_oid', 'sequence']
         i=0
@@ -74,7 +71,8 @@ class Websocket():
             self._Nasluch()
             self._Rozlacz()
         self.stop=False
-        self.thread=Thread(target=_go)
+        self.on_open()
+        self.thread=Thread.Thread(target=_go)
         self.thread.start()
 
     def _Polacz(self):
@@ -96,7 +94,7 @@ class Websocket():
             except Exception as e:
                 self.on_error(e)
             else:
-                self.wiadomosc(dane)
+                self.on_message(dane)
 
     def _Rozlacz(self):
         try:
@@ -110,6 +108,14 @@ class Websocket():
         self.stop= True
         self.thread.join()
 
+    def on_open(self):
+        print("-- Subscribed! --\n")
+        
+
+    def on_message(self, dane):
+        print(dane)
+        print(Thread.active_count())
+        
 
     def on_close(self):
         if self.should_print:
@@ -131,9 +137,7 @@ class Websocket():
            elif self.kanaly=="level2":
                 self.KonektorWebsocketLevel2(dane=dane)
            conn.commit()
-        elif self.bd_bot==2:
-            bot=Bots()
-            bot.Adria(dane=dane, smas=[])
+
 class Requester():
     def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
@@ -198,17 +202,24 @@ class StockIndicators():
         ema[:zakres]=ema[zakres]
 
         return ema
-class Bots():
-    def __init__(self, cena=[], czas=[], smas=[]):
+
+class Adria(MyWebsocket):
+    def __init__(self, cena=[], czas=[], smas=[], produkty="BTC-EUR"):
         self.cena=cena
         self.czas=czas
-    def Adria(self, dane, smas):
+        self.produkty=produkty   
+    def start(self, produkty):  
+        webs=MyWebsocket(produkty=produkty, kanaly=['ticker'])
+        webs.start()   
+
+    def on_message(self, dane):
         a=dane.get('price', None)
         t=dane.get('time', None)
-        zakres=int(20)
-        zakres2=int(40)
-        zakres3=int(60)
-        zakres4=int(120)
+        zakres=int(3)
+        zakres2=int(5)
+        zakres3=int(10)
+        zakres4=int(20)
+        
         if a is not None:
             self.cena.append(float(a))
             self.czas.append(t)
@@ -217,7 +228,6 @@ class Bots():
                 smas=Si.SI_sma(cena=self.cena, zakres=zakres)                 
                 ema=Si.SI_ema(cena=self.cena, zakres=zakres)
                 diff=np.subtract(smas[-1],ema[-1])
-                #diff=(smas[-1])-(ema[-1])
 
                 if len(self.cena)<=zakres2:
                     print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
@@ -242,15 +252,11 @@ class Bots():
                 diff4=((ema3[-1])-(ema4[-1]))
                 print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6),round(ema4[-1],6)))
                 print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f} ema3/ema4:{:.6f}'.format(diff,diff2,diff3,diff4))
-            #
-            #    if self.cena[-1]>smas[-1]:
-            #        print("sprzedaje")
-            #    if self.cena[-1]<smas[-1]:
-            #        print('kupuje')
-            #    else:
-            #        print('wait')
-        else:
-            pass
+
+            else:
+                pass
+
+
 
 
 class Autotrader():
@@ -296,5 +302,6 @@ class Autotrader():
             webr=Requester(produkty=produkty, start=start, end=end, skala=skala, bd_bot=bd_bot)
             webr.Historic_rates_divider()
     elif bd_bot==2:
-        webs=Websocket(produkty=produkty, kanaly=['ticker'], bd_bot=bd_bot)
-        webs.start()
+        bot=Adria()
+        bot.start(produkty)
+Autotrader()
