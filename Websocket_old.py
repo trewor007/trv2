@@ -6,6 +6,7 @@ import urllib3
 import timeit
 import urllib.request
 import requests
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -65,20 +66,21 @@ class Websocket():
                 print('{} [Reconecting] {}/{}'.format(time.ctime(),v,n))
                 v=v+1
                 n=n+1
-                self.on_error(e)
+                self.on_error(e,n,z,x,v)
             except WebSocketBadStatusException as e:
-                self.on_error(e)
+                self.on_error(e,n,z,x,v)
             except ValueError as e:
-                self.on_error(e)
+                self.on_error(e,n,z,x,v)
             except Exception as e:
-                self.on_error(e)
-            self.wiadomosc(dane)
-    def on_error(self, e):
+                self.on_error(e,n,z,x,v)
+            self.wiadomosc(dane,n,z,x,v)
+        return(n,z,x,v)
+    def on_error(self, e,n,z,x,v):
         with open('error_old.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
         time.sleep(0.4)
         self._Polacz(n,z,x,v)
-    def wiadomosc(self, dane):
+    def wiadomosc(self, dane,n,z,x,v):
         if self.bd_bot==1:
            self.KonektorWebsocketTicker(dane=dane)
            conn.commit()
@@ -92,4 +94,4 @@ class Autotrader():
     bd_bot=1
     z=x=v=n=1
     webs=Websocket(produkty=produkty, kanaly=kanaly, bd_bot=bd_bot)
-    webs._Polacz(n,z,x,v)
+    webs._Polacz(n=n,z=z,x=x,v=v)

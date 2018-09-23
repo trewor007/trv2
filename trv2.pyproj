@@ -27,13 +27,18 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Autotrader.py" />
+    <Compile Include="Autotrader_10.py" />
     <Compile Include="Autotrader_Dev.py" />
     <Compile Include="Autotrader_Dev.py" />
+    <Compile Include="Autotrader_Dev_moving to bot.py" />
     <Compile Include="mockup.py" />
     <Compile Include="module1.py" />
     <Compile Include="module2.py" />
     <Compile Include="module3.py" />
     <Compile Include="module4.py" />
+    <Compile Include="Aga.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="test1.py" />
     <Compile Include="websocket_client.py" />
     <Compile Include="Websocket_old.py" />

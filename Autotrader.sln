@@ -8,6 +8,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{975B0833-BB78-4133-A06E-B36CAC338AC3}"
 	ProjectSection(SolutionItems) = preProject
 		Autotrader\Autotrader0.0.2a.py = Autotrader\Autotrader0.0.2a.py
+		Autotrader_10.py = Autotrader_10.py
 	EndProjectSection
 EndProject
 Global

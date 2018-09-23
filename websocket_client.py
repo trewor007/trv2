@@ -1,9 +1,9 @@
-# gdax/WebsocketClient.py
+# cbpro/WebsocketClient.py
 # original author: Daniel Paquin
 # mongo "support" added by Drew Rice
 #
 #
-# Template object to receive messages from the gdax Websocket Feed
+# Template object to receive messages from the Coinbase Websocket Feed
 
 from __future__ import print_function
 import json
@@ -11,18 +11,19 @@ import base64
 import hmac
 import hashlib
 import time
-from threading import Thread
+import os
+import threading  as Thread
 from websocket import create_connection, WebSocketConnectionClosedException
 from pymongo import MongoClient
-#from gdax.gdax_auth import get_auth_headers
+from cbpro_auth import get_auth_headers
 
 
 class WebsocketClient(object):
-    def __init__(self, url="wss://ws-feed.gdax.com", products=None, message_type="subscribe", mongo_collection=None,
-                 should_print=True, auth=False, api_key="", api_secret="", api_passphrase="", channels=None):
+    def __init__(self, url="wss://ws-feed.pro.coinbase.com", products=None, message_type="subscribe", mongo_collection=None,
+                 should_print=True, auth=False, api_key="", api_secret="", api_passphrase="", channels=['ticker']):
         self.url = url
         self.products = products
-        self.channels = channels
+        self.channels = ['ticker']
         self.type = message_type
         self.stop = False
         self.error = None
@@ -43,12 +44,12 @@ class WebsocketClient(object):
 
         self.stop = False
         self.on_open()
-        self.thread = Thread(target=_go)
+        self.thread = Thread(target=_go, name="slucham")
         self.thread.start()
 
     def _connect(self):
         if self.products is None:
-            self.products = ["BTC-USD"]
+            self.products = ["BTC-EUR"]
         elif not isinstance(self.products, list):
             self.products = [self.products]
 
@@ -63,33 +64,44 @@ class WebsocketClient(object):
         if self.auth:
             timestamp = str(time.time())
             message = timestamp + 'GET' + '/users/self/verify'
-            message = message.encode('ascii')
-            hmac_key = base64.b64decode(self.api_secret)
-            signature = hmac.new(hmac_key, message, hashlib.sha256)
-            signature_b64 = base64.b64encode(signature.digest()).decode('utf-8').rstrip('\n')
-            sub_params['signature'] = signature_b64
-            sub_params['key'] = self.api_key
-            sub_params['passphrase'] = self.api_passphrase
-            sub_params['timestamp'] = timestamp
+            auth_headers = get_auth_headers(timestamp, message, self.api_key, self.api_secret, self.api_passphrase)
+            sub_params['signature'] = auth_headers['CB-ACCESS-SIGN']
+            sub_params['key'] = auth_headers['CB-ACCESS-SIGN']
+            sub_params['passphrase'] = auth_headers['CB-ACCESS-KEY']
+            sub_params['timestamp'] = auth_headers['CB-ACCESS-TIMESTAMP']
 
         self.ws = create_connection(self.url)
 
-        if self.type == "heartbeat":
-            sub_params = {"type": "heartbeat", "on": True}
-        else:
-            sub_params = {"type": "heartbeat", "on": False}
         self.ws.send(json.dumps(sub_params))
 
+    def keepalive(self, interval=30):
+        print("dzialam")
+        while not self.stop:
+            if self.ws:
+                self.ws.ping('keepalive')
+                print("pinged")
+                intervalCounter = 0
+                while intervalCounter < interval:
+                    if self.stop:
+                        return
+                    intervalCounter += 1
+                    time.sleep(1)
+
     def _listen(self):
+        Thread(target=self.keepalive, name="ping").start()
         while not self.stop:
             try:
-                start_t = 0
-                if time.time() - start_t >= 30:
-                    # Set a 30 second ping to keep connection alive
-                    self.ws.ping("keepalive")
-                    start_t = time.time()
+
+                #start_t = 0
+                #if time.time() - start_t >= 30:
+                #    # Set a 30 second ping to keep connection alive
+                #    self.ws.ping("keepalive")
+                #    start_t = time.time()
+
                 data = self.ws.recv()
                 msg = json.loads(data)
+                
+
             except ValueError as e:
                 self.on_error(e)
             except Exception as e:
@@ -98,8 +110,6 @@ class WebsocketClient(object):
                 self.on_message(msg)
 
     def _disconnect(self):
-        if self.type == "heartbeat":
-            self.ws.send(json.dumps({"type": "heartbeat", "on": False}))
         try:
             if self.ws:
                 self.ws.close()
@@ -130,18 +140,23 @@ class WebsocketClient(object):
         self.error = e
         self.stop = True
         print('{} - data: {}'.format(e, data))
+        with open('error2.txt','a') as txt_file:
+            print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
 
 
 if __name__ == "__main__":
     import sys
-    import gdax
+    import cbpro
     import time
 
 
-    class MyWebsocketClient(gdax.WebsocketClient):
+    class MyWebsocketClient(cbpro.WebsocketClient):
+        def cls(self):
+            os.system("CLS")
         def on_open(self):
-            self.url = "wss://ws-feed.gdax.com/"
-            self.products = ["BTC-USD", "ETH-USD"]
+            self.url = "wss://ws-feed.pro.coinbase.com/"
+            self.products = ["BTC-EUR"]
+            self.channels = ['ticker']
             self.message_count = 0
             print("Let's count the messages!")
 
@@ -158,7 +173,11 @@ if __name__ == "__main__":
     print(wsClient.url, wsClient.products)
     try:
         while True:
+           # wsClient.cls()
             print("\nMessageCount =", "%i \n" % wsClient.message_count)
+            print(Thread.active_count())
+            
+
             time.sleep(1)
     except KeyboardInterrupt:
         wsClient.close()

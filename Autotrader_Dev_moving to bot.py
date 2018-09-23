@@ -6,16 +6,13 @@ import urllib3
 import timeit
 import urllib.request
 import requests
-import queue
-import os
-
 import numpy as np
-import threading as Thread
+from threading import Thread
 from websocket import create_connection, WebSocketConnectionClosedException
 
 conn=sqlite3.connect('bazadanych.db')
 c = conn.cursor()
-q = queue.Queue()
+
 
 class MyWebsocket(object):
 
@@ -70,48 +67,40 @@ class MyWebsocket(object):
         pass
     def start(self):
         def _go():
-            self._connect()
-            self._listen()
-            self._disconnect()
-
+            self._Polacz()
+            self._Nasluch()
+            self._Rozlacz()
         self.stop=False
-        self.on_open()
-        self.thread=Thread.Thread(target=_go)
+        self.thread=Thread(target=_go)
         self.thread.start()
 
-    def _connect(self):
-        self.ws=create_connection(self.wsurl)
+    def _Polacz(self):
+        self.ws=create_connection(self.wsurl, timeout=180)
 
         if self.kanaly is None:
             self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty}))
         else:
             self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty, 'channels': [{"name": self.kanaly, 'product_ids': self.produkty,}]}))    #wysłanie subskrybcji
-
-    def _listen(self):
+    def _Nasluch(self):
         while not self.stop:
             try:
-                start_t = 0
-
-                data = self.ws.recv()
-                dane = json.loads(data)
-                if time.time() - start_t >= 30:
-                    # Set a 30 second ping to keep connection alive
-                    self.ws.ping("keepalive")
-                    start_t = time.time()
+                if (time.time() - self.ping_start) >= 20:
+                    self.ws.ping()
+                    self.ping_start = time.time()
+                dane=json.loads(self.ws.recv())
             except ValueError as e:
                 self.on_error(e)
             except Exception as e:
                 self.on_error(e)
-                self._connect()
             else:
                 self.on_message(dane)
-    def _disconnect(self):
+
+    def _Rozlacz(self):
         try:
             if self.ws:
                 self.ws.close()
         except WebSocketConnectionClosedException as e:
             pass
-
         self.on_close()
 
     def close(self):
@@ -119,20 +108,21 @@ class MyWebsocket(object):
         self.thread.join()
 
     def on_open(self):
-        print("-- Subscribed! --\n")   
-    
+        pass
+
     def on_message(self, dane):
-        #print(dane)
-        q.put(dane)
-        print(q.qsize())
-        #print(Thread.active_count())      
+        print(dane)
+
+
     def on_close(self):
         if self.should_print:
-            print("\n-- Socket Closed --")            
+            print("\n-- Socket Closed --")
+
     def on_error(self, e):
         with open('error.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
-
+        time.sleep(0.4)
+        self.start()
     def wiadomosc(self, dane):
         if self.bd_bot==1:
            if self.kanaly==None:
@@ -144,6 +134,7 @@ class MyWebsocket(object):
            elif self.kanaly=="level2":
                 self.KonektorWebsocketLevel2(dane=dane)
            conn.commit()
+
 class Requester():
     def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
@@ -199,7 +190,7 @@ class StockIndicators():
         weights=np.ones((zakres,))/zakres
         smas=np.convolve(self.cena, weights, 'valid')
         return smas
-        
+
     def SI_ema(self, cena, zakres):
         self.cena=cena
         weights_ema = np.exp(np.linspace(-1.,0.,zakres))
@@ -208,68 +199,59 @@ class StockIndicators():
         ema[:zakres]=ema[zakres]
 
         return ema
+
 class Adria(MyWebsocket):
-   
-    a=0
-    t=0
-    def __init__(self, cena=[], czas=[], smas=[], produkty="BTC-EUR", zakres=int(3), zakres2=int(5), zakres3=int(10), zakres4=int(20)):
+    def __init__(self, cena=[], czas=[], smas=[], produkty="BTC-EUR"):
         self.cena=cena
         self.czas=czas
         self.produkty=produkty
-        self.zakres=zakres
-        self.zakres2=zakres2
-        self.zakres3=zakres3
-        self.zakres4=zakres4
-
-    def start(self, produkty):  
+    def start(produkty):
         webs=MyWebsocket(produkty=produkty, kanaly=['ticker'])
-        webs.start()  
-        while True:
-            if q.not_empty:            
-                dane=q.get()            
-                print(json.dumps(dane, indent=4, sort_keys=True))
-                a=dane.get('price', None)
-                t=dane.get('time', None)
+        webs.start()
+        
+    def on_message(self, dane):
+        a=dane.get('price', None)
+        t=dane.get('time', None)
+        zakres=int(3)
+        zakres2=int(5)
+        zakres3=int(10)
+        zakres4=int(20)
 
-            if a is not None:
+        if a is not None:
+            self.cena.append(float(a))
+            self.czas.append(t)
+            if len(self.cena)>zakres:
+                Si=StockIndicators()
+                smas=Si.SI_sma(cena=self.cena, zakres=zakres)
+                ema=Si.SI_ema(cena=self.cena, zakres=zakres)
+                diff=np.subtract(smas[-1],ema[-1])
 
-                self.cena.append(float(a))
-                self.czas.append(t)
-                if len(self.cena)>self.zakres:
-                    Si=StockIndicators()
-                    smas=Si.SI_sma(cena=self.cena, zakres=self.zakres)                 
-                    ema=Si.SI_ema(cena=self.cena, zakres=self.zakres)
-                    diff=np.subtract(smas[-1],ema[-1])
+                if len(self.cena)<=zakres2:
+                    print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
+                    print('smas/ema:{:.6f}'.format(diff))
 
-                    if len(self.cena)<=self.zakres2:
-                        print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
-                        print('smas/ema:{:.6f}'.format(diff))
+            if len(self.cena)>zakres2:
+                ema2=Si.SI_ema(cena=self.cena, zakres=zakres2)
+                diff2=((ema[-1])-(ema2[-1]))
+                if len(self.cena)<=zakres3:
+                    print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6)))
+                    print('smas/ema:{:.6f} ema/ema2:{:.6f}'.format(diff,diff2))
 
-                if len(self.cena)>self.zakres2:
-                    ema2=Si.SI_ema(cena=self.cena, zakres=self.zakres2)
-                    diff2=((ema[-1])-(ema2[-1]))
-                    if len(self.cena)<=self.zakres3:
-                        print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6)))
-                        print('smas/ema:{:.6f} ema/ema2:{:.6f}'.format(diff,diff2))    
+            if len(self.cena)>zakres3:
+                ema3=Si.SI_ema(cena=self.cena, zakres=zakres3)
+                diff3=((ema2[-1])-(ema3[-1]))
+                if len(self.cena)<=zakres4:
+                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))
+                    print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f}'.format(diff,diff2,diff3))
 
-                if len(self.cena)>self.zakres3:
-                    ema3=Si.SI_ema(cena=self.cena, zakres=self.zakres3)
-                    diff3=((ema2[-1])-(ema3[-1]))
-                    if len(self.cena)<=self.zakres4:
-                        print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))
-                        print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f}'.format(diff,diff2,diff3))
+            if len(self.cena)>zakres4:
+                ema4=Si.SI_ema(cena=self.cena, zakres=zakres4)
+                diff4=((ema3[-1])-(ema4[-1]))
+                print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6),round(ema4[-1],6)))
+                print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f} ema3/ema4:{:.6f}'.format(diff,diff2,diff3,diff4))
 
-                if len(self.cena)>self.zakres4:
-                    ema4=Si.SI_ema(cena=self.cena, zakres=self.zakres4)
-                    diff4=((ema3[-1])-(ema4[-1]))
-                    print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6),round(ema4[-1],6)))
-                    print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f} ema3/ema4:{:.6f}'.format(diff,diff2,diff3,diff4))
-
-                else:
-                    pass
-
-
-
+            else:
+                pass
 
 
 
@@ -308,7 +290,7 @@ class Autotrader():
             else:
                 print('ERROR:WRONG ARGUMENT! (c)=', c)
             webs=Websocket(produkty=produkty, kanaly=kanaly, bd_bot=bd_bot)
-            webs._connect()
+            webs._Polacz()
         elif b=='2':
             start=time.mktime(time.strptime(input("podaj Poczatek   [dd-mm-rrrr hh:mm] "), '%d-%m-%Y %H:%M'))
             end=time.mktime(time.strptime(input("podaj Koniec   [dd-mm-rrrr hh:mm] "), '%d-%m-%Y %H:%M'))
@@ -316,7 +298,4 @@ class Autotrader():
             webr=Requester(produkty=produkty, start=start, end=end, skala=skala, bd_bot=bd_bot)
             webr.Historic_rates_divider()
     elif bd_bot==2:
-        bot=Adria()
-        bot.start(produkty)
-
-Autotrader()
+        Adria.start(produkty=produkty)
