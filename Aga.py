@@ -27,47 +27,7 @@ class MyWebsocket(object):
         self.produkty=produkty
         self.newdict=newdict
         self.kanaly=kanaly
-        self.bd_bot=bd_bot
-
-    def KonektorWebsocketSubskribe(self, dane):
-        b=['type', 'side', 'price', 'time', 'order_id', 'product_id', 'order_type', 'size', 'reason', 'remaining_size', 'client_oid', 'sequence']
-        i=0
-        while i<len(b):
-           a = eval("dane.get('" + b[i] + "', None)")
-           self.newdict[b[i]]=a
-           i=i+1
-        c.execute("INSERT INTO Subskribe (type, side, price, time, order_id, product_id, order_type, size, reason, remaining_size, client_oid, sequence) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", (self.newdict["type"], self.newdict["side"], self.newdict["price"], self.newdict["time"],  self.newdict["order_id"], self.newdict["product_id"], self.newdict["order_type"], self.newdict["size"], self.newdict["reason"], self.newdict["remaining_size"], self.newdict["client_oid"], self.newdict["sequence"]))
-    def KonektorWebsocketTicker(self, dane):
-        b=['type', 'sequence', 'product_id', 'price', 'open_24h', 'volume_24h', 'low_24h', 'high_24h', 'volume_30d', 'best_bid', 'best_ask', 'side', 'time', 'trade_id', 'last_size']
-        i=0
-        typtranzakcji=dane.get('type',None)
-        if typtranzakcji=='ticker':
-            while i<len(b):
-                a = eval("dane.get('" + b[i] + "', None)")
-                self.newdict[b[i]]=a
-                i=i+1
-            c.execute("INSERT INTO Ticker(type, sequence, product_id, price, open_24h, volume_24h, low_24h, high_24h, volume_30d, best_bid, best_ask, side, time, trade_id, last_size) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (self.newdict['type'], self.newdict['sequence'], self.newdict['product_id'], self.newdict['price'], self.newdict['open_24h'], self.newdict['volume_24h'], self.newdict['low_24h'], self.newdict['high_24h'], self.newdict['volume_30d'], self.newdict['best_bid'], self.newdict['best_ask'], self.newdict['side'], self.newdict['time'], self.newdict['trade_id'], self.newdict['last_size']))
-    def KonektorWebsocketLevel2(self, dane):
-        b=['type', 'product_id', 'time', 'bids', 'asks', 'changes']
-        i=0
-        typtranzakcji=dane.get('type',None)
-        if (typtranzakcji=='snapshot' or typtranzakcji=='l2update'):
-            while i<len(b):
-                a = eval("dane.get('" + b[i] + "', None)")
-                self.newdict[b[i]]=a
-                i=i+1
-            c.execute("INSERT INTO l2update(type, product_id, time, bids, asks, changes) VALUES (?,?,?,?,?,?)", (self.newdict['type'], self.newdict['product_id'], self.newdict['time'], str(self.newdict['bids']), str(self.newdict['asks']), str(self.newdict['changes'])))
-    def KonektorWebsocketHeartbeat(self, dane):
-        b=["last_trade_id","product_id","sequence","time","type"]
-        i=0
-        while i<len(b):
-            a = eval("dane.get('" + b[i] + "', None)")
-            self.newdict[b[i]]=a
-            i=i+1
-        c.execute("INSERT INTO Heartbeat(type, sequence, product_id, time, last_trade_id) VALUES (?,?,?,?,?)", (self.newdict['type'], self.newdict['sequence'], self.newdict['product_id'], self.newdict['time'], self.newdict['last_trade_id']))
-    def tabelaKreacja():                        #tworzenie tabeli // nie u�ywane nigdzie w programie sprawdzi� funkcje CREATE TABLE IF NOT EXISTS i wstawienia bezpo�rednio do programu( nie w p�tli)
-        c.execute("CREATE TABLE IF NOT EXISTS tabelka(ID NUMERIC, Dane TEXT,)") # nawias wywala b��d
-        pass
+    
     def start(self):
         def _go():
             self._connect()
@@ -81,22 +41,13 @@ class MyWebsocket(object):
 
     def _connect(self):
         self.ws=create_connection(self.wsurl)
+        self.ws.send(json.dumps({"type": "subscribe", "product_ids": self.produkty, "channels": ["heartbeat", { "name": "ticker", "product_ids": self.produkty}]}))    #wysyłanie subskrybcji
 
-        if self.kanaly is None:
-            self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty}))
-        else:
-            self.ws.send(json.dumps({'type': 'subscribe', 'product_ids': self.produkty, 'channels': [{"name": self.kanaly, 'product_ids': self.produkty,}]}))    #wys�anie subskrybcji
     def _listen(self):
         while not self.stop:
             try:
-                start_t = 0
-
                 data = self.ws.recv()
                 dane = json.loads(data)
-                if time.time() - start_t >= 30:
-                    # Set a 30 second ping to keep connection alive
-                    self.ws.ping("keepalive")
-                    start_t = time.time()
             except ValueError as e:
                 self.on_error(e)
             except Exception as e:
@@ -131,17 +82,6 @@ class MyWebsocket(object):
         with open('error.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
 
-    def wiadomosc(self, dane):
-        if self.bd_bot==1:
-           if self.kanaly==None:
-                self.KonektorWebsocketSubskribe(dane=dane)
-           elif self.kanaly=="heartbeat":
-                self.KonektorWebsocketHeartbeat(dane=dane)
-           elif self.kanaly==["ticker"]:
-                self.KonektorWebsocketTicker(dane=dane)
-           elif self.kanaly=="level2":
-                self.KonektorWebsocketLevel2(dane=dane)
-           conn.commit()
 class Requester():
     def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
@@ -207,8 +147,14 @@ class StockIndicators():
 
         return ema
 
-
-
+b=False
+cena=[]
+czas=[]
+smas=[]
+zakres=int(10) 
+zakres2=int(20) 
+zakres3=int(40)
+zakres4=int(80)
 print("Podaj pare walut ktore chcesz wykorzystac")
 a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] [5 ETH-BTC] [6 BCH-BTC] [7 BCH-EUR]"))
 if a==1:
@@ -226,47 +172,49 @@ elif a==6:
 elif a==7:
     produkty=["BCH-EUR"]
 
-webs=MyWebsocket(produkty=produkty, kanaly=['ticker'])
+webs=MyWebsocket(produkty=produkty)
 webs.start()  
 while True:
     if q.not_empty:            
-        dane=q.get()            
-        print(json.dumps(dane, indent=4, sort_keys=True))
-        a=dane.get('price', None)
-        t=dane.get('time', None)
-        print(a)
-        print(t)
-
-    if a is not None:
-
-        self.cena.append(float(a))
-        self.czas.append(t)
-        if len(self.cena)>self.zakres:
+        dane=q.get()        
+        typ=dane.get('type',None)
+        if typ=='ticker':
+            a=dane.get('price', None)
+            t=dane.get('time', None)
+            print(json.dumps(dane, indent=4, sort_keys=True))
+            print(a)
+            print(t)
+            b==True
+    if b is True:
+        b==False
+        cena.append(float(a))
+        czas.append(t)
+        if len(cena)>zakres:
             Si=StockIndicators()
-            smas=Si.SI_sma(cena=self.cena, zakres=self.zakres)                 
-            ema=Si.SI_ema(cena=self.cena, zakres=self.zakres)
+            smas=Si.SI_sma(cena=cena, zakres=zakres)                 
+            ema=Si.SI_ema(cena=cena, zakres=zakres)
             diff=np.subtract(smas[-1],ema[-1])
 
-            if len(self.cena)<=self.zakres2:
+            if len(cena)<=zakres2:
                 print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
                 print('smas/ema:{:.6f}'.format(diff))
 
-        if len(self.cena)>self.zakres2:
-            ema2=Si.SI_ema(cena=self.cena, zakres=self.zakres2)
+        if len(cena)>zakres2:
+            ema2=Si.SI_ema(cena=cena, zakres=zakres2)
             diff2=((ema[-1])-(ema2[-1]))
-            if len(self.cena)<=self.zakres3:
+            if len(cena)<=zakres3:
                 print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6)))
                 print('smas/ema:{:.6f} ema/ema2:{:.6f}'.format(diff,diff2))    
 
-        if len(self.cena)>self.zakres3:
-            ema3=Si.SI_ema(cena=self.cena, zakres=self.zakres3)
+        if len(cena)>zakres3:
+            ema3=Si.SI_ema(cena=cena, zakres=zakres3)
             diff3=((ema2[-1])-(ema3[-1]))
-            if len(self.cena)<=self.zakres4:
+            if len(cena)<=zakres4:
                 print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))
                 print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f}'.format(diff,diff2,diff3))
 
-        if len(self.cena)>self.zakres4:
-            ema4=Si.SI_ema(cena=self.cena, zakres=self.zakres4)
+        if len(cena)>zakres4:
+            ema4=Si.SI_ema(cena=cena, zakres=zakres4)
             diff4=((ema3[-1])-(ema4[-1]))
             print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6),round(ema4[-1],6)))
             print('smas/ema:{:.6f} ema/ema2:{:.6f} ema2/ema3:{:.6f} ema3/ema4:{:.6f}'.format(diff,diff2,diff3,diff4))
