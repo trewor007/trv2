@@ -16,5 +16,5 @@ def Pobieranie_danych():
  
 while True:
     Pobieranie_danych()
-
+{"type": "subscribe", "product_ids": [self.produkty], "channels": ["heartbeat", { "name": "ticker", "product_ids": [self.produkty]}]}
 
