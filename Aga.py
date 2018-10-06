@@ -142,8 +142,34 @@ class StockIndicators():
         weights_ema /= weights_ema.sum()
         ema=np.convolve(self.cena,weights_ema)[:len(self.cena)]
         ema[:zakres]=ema[zakres]
-
         return ema
+
+    def SI_RSI (self, cena, zakres=14):
+        deltas = np.diff(cena)
+        seed = deltas[:zakres+1]
+        up = seed[seed >= 0].sum()/zakres
+        down = -seed[seed < 0].sum()/zakres
+        rs = up/down
+        rsi = np.zeros_like(cena)
+        rsi[:zakres] = 100. - 100./(1. + rs)
+
+        for i in range(zakres, len(cena)):
+            delta = deltas[i - 1]  # cause the diff is 1 shorter
+            if delta > 0:
+                upval = delta
+                downval = 0.
+            else:
+                upval = 0.
+                downval = -delta
+ 
+            up = (up*(zakres - 1) + upval)/zakres
+            down = (down*(zakres - 1) + downval)/zakres
+            rs = up/down
+            rsi[i] = 100. - 100./(1. + rs)
+        if len(cena) > zakres:
+            return rsi[-1]
+        else:
+            return 50 
 
 smas_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
 ema_budget=     {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
@@ -194,7 +220,9 @@ while True:
             Si=StockIndicators()
             smas=Si.SI_sma(cena=cena, zakres=zakres)                 
             ema=Si.SI_ema(cena=cena, zakres=zakres)
+            rsi=Si.SI_RSI(cena=cena)
             print("===========================================================")
+            print(rsi)
             if ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and smas_budget["kupiono"]==True):
                 smas_budget["kupiono"]=False
                 smas_budget["BuyPrice"]=cena[-1]
