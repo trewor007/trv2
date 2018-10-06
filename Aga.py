@@ -172,18 +172,20 @@ class StockIndicators():
             return 50 
 
 smas_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema_budget=     {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema2_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema3_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema4_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
+ema_budget=     [{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}]
+#ema_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
+#ema2_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
+#ema3_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
+#ema4_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
+ema=[[],[],[],[]]
 b=False
 cena=[]
 czas=[]
 smas=[]
-zakres=int(10) 
-zakres2=int(20) 
-zakres3=int(40)
-zakres4=int(80)
+#zakres=[int(10), int(20) , int(40),int(80)]
+zakres=[10, 20, 40, 80]
+
+Si=StockIndicators()
 print("Podaj pare walut ktore chcesz wykorzystac")
 a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] [5 ETH-BTC] [6 BCH-BTC] [7 BCH-EUR]"))
 if a==1:
@@ -216,13 +218,12 @@ while True:
         b=False
         cena.append(float(a))
         czas.append(t)
-        if len(cena)>zakres:
-            Si=StockIndicators()
-            smas=Si.SI_sma(cena=cena, zakres=zakres)                 
-            ema=Si.SI_ema(cena=cena, zakres=zakres)
+        if len(cena)>zakres[0]:
+            
+            smas=Si.SI_sma(cena=cena, zakres=zakres[0])                 
             rsi=Si.SI_RSI(cena=cena)
             print("===========================================================")
-            print(rsi)
+            print("Rsi: {}. Cena Size: {}".format(rsi, len(cena)))
             if ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and smas_budget["kupiono"]==True):
                 smas_budget["kupiono"]=False
                 smas_budget["BuyPrice"]=cena[-1]
@@ -236,67 +237,25 @@ while True:
                 print("SMAS_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],smas_budget["1coin"],smas_budget["2coin"]))
             else:
                 print("SMAS_PASS current budget {} 1coin. {} 2coin".format(smas_budget["1coin"],smas_budget["2coin"]))
-            if ((cena[-1]>ema[-1]) and (cena[-1]<cena[-2]) and ema_budget["kupiono"]==True):
-                ema_budget["kupiono"]=False
-                ema_budget["BuyPrice"]=cena[-1]
-                ema_budget["2coin"]=round((ema_budget["1coin"]*cena[-1]),2)
-                ema_budget["1coin"]=0
-                print("EMA_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema_budget["1coin"],ema_budget["2coin"]))
-            elif ((cena[-1]<ema[-1]) and (cena[-1]>cena[-2]) and (ema_budget["kupiono"]==False) and (ema_budget["BuyPrice"]<cena[-1])):
-                ema_budget["kupiono"]=True
-                ema_budget["1coin"]=round((ema_budget["2coin"]/cena[-1]),7)
-                ema_budget["2coin"]=0
-                print("EMA_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema_budget["1coin"],ema_budget["2coin"]))
-            else:
-                print("EMA_PASS current budget {} 1coin. {} 2coin".format(ema_budget["1coin"],ema_budget["2coin"]))
-                  
-        if len(cena)>zakres2:
-            ema2=Si.SI_ema(cena=cena, zakres=zakres2)
-            if ((cena[-1]>ema2[-1]) and (cena[-1]<cena[-2]) and ema2_budget["kupiono"]==True):
-                ema2_budget["kupiono"]=False
-                ema2_budget["BuyPrice"]=cena[-1]
-                ema2_budget["2coin"]=round((ema2_budget["1coin"]*cena[-1]),2)
-                ema2_budget["1coin"]=0
-                print("ema2_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema2_budget["1coin"],ema2_budget["2coin"]))
-            elif ((cena[-1]<ema2[-1]) and (cena[-1]>cena[-2]) and (ema2_budget["kupiono"]==False)  and (ema2_budget["BuyPrice"]<cena[-1])):
-                ema2_budget["kupiono"]=True
-                ema2_budget["1coin"]=round((ema2_budget["2coin"]/cena[-1]),7)
-                ema2_budget["2coin"]=0
-                print("ema2_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema2_budget["1coin"],ema2_budget["2coin"]))
-            else:
-                print("EMA2_PASS current budget {} 1coin. {} 2coin".format(ema2_budget["1coin"],ema2_budget["2coin"]))   
-
-        if len(cena)>zakres3:
-            ema3=Si.SI_ema(cena=cena, zakres=zakres3)
-            if ((cena[-1]>ema3[-1]) and (cena[-1]<cena[-2]) and ema3_budget["kupiono"]==True):
-                ema3_budget["kupiono"]=False
-                ema3_budget["BuyPrice"]=cena[-1]
-                ema3_budget["2coin"]=round((ema3_budget["1coin"]*cena[-1]),2)
-                ema3_budget["1coin"]=0
-                print("ema3_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema3_budget["1coin"],ema3_budget["2coin"]))
-            elif ((cena[-1]<ema3[-1]) and (cena[-1]>cena[-2]) and (ema3_budget["kupiono"]==False) and (ema3_budget["BuyPrice"]<cena[-1])):
-                ema3_budget["kupiono"]=True
-                ema3_budget["1coin"]=round((ema3_budget["2coin"]/cena[-1]),7)
-                ema3_budget["2coin"]=0
-                print("ema3_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema3_budget["1coin"],ema3_budget["2coin"]))
-            else:
-                print("EMA3_PASS current budget {} 1coin. {} 2coin".format(ema3_budget["1coin"],ema3_budget["2coin"]))
-
-        if len(cena)>zakres4:
-            ema4=Si.SI_ema(cena=cena, zakres=zakres4)
-            if ((cena[-1]>ema4[-1]) and (cena[-1]<cena[-2]) and ema4_budget["kupiono"]==True):
-                ema4_budget["kupiono"]=False
-                ema4_budget["BuyPrice"]=cena[-1]
-                ema4_budget["2coin"]=round((ema4_budget["1coin"]*cena[-1]),2)
-                ema4_budget["1coin"]=0
-                print("ema4_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema4_budget["1coin"],ema4_budget["2coin"]))
-            elif ((cena[-1]<ema4[-1]) and (cena[-1]>cena[-2]) and (ema4_budget["kupiono"]==False) and (ema4_budget["BuyPrice"]<cena[-1])):
-                ema4_budget["kupiono"]=True
-                ema4_budget["1coin"]=round((ema4_budget["2coin"]/cena[-1]),7)
-                ema4_budget["2coin"]=0
-                print("ema4_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema4_budget["1coin"],ema4_budget["2coin"]))
-            else:
-                print("EMA4_PASS current budget {} 1coin. {} 2coin".format(ema4_budget["1coin"],ema4_budget["2coin"]))
+            for i in zakres:                
+                if len(cena)>i:
+                    j=zakres.index(i)
+                    e=Si.SI_ema(cena=cena, zakres=i)
+                    k=e.tolist()
+                    ema[j].append(k[-1])
+                    if ((cena[-1]>ema[j][-1]) and (cena[-1]<cena[-2]) and ema_budget[j]["kupiono"]==True):
+                        ema_budget[j]["kupiono"]=False
+                        ema_budget[j]["BuyPrice"]=cena[-1]
+                        ema_budget[j]["2coin"]=round((ema_budget[j]["1coin"]*cena[-1]),2)
+                        ema_budget[j]["1coin"]=0
+                        print("ema{}_SELL @ Price {} current budget {} 1coin. {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
+                    elif ((cena[-1]<ema[j][-1]) and (cena[-1]>cena[-2]) and (ema_budget[j]["kupiono"]==False) and (ema_budget[j]["BuyPrice"]<cena[-1])):
+                        ema_budget[j]["kupiono"]=True
+                        ema_budget[j]["1coin"]=round((ema_budget[j]["2coin"]/cena[-1]),7)
+                        ema_budget[j]["2coin"]=0
+                        print("ema{}_BUY @ Price {} current budget {} 1coin. {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
+                    else:
+                        print("EMA{}_PASS current budget {} 1coin. {} 2coin".format((j+1),ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
 
         else:
             pass
