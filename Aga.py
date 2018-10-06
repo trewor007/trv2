@@ -198,12 +198,12 @@ while True:
             if ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and smas_budget["kupiono"]==True):
                 smas_budget["kupiono"]=False
                 smas_budget["BuyPrice"]=cena[-1]
-                smas_budget["2coin"]=(smas_budget["1coin"]*cena[-1])
+                smas_budget["2coin"]=round((smas_budget["1coin"]*cena[-1]),2)
                 smas_budget["1coin"]=0
                 print("SMAS_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],smas_budget["1coin"],smas_budget["2coin"]))
             elif ((cena[-1]<smas[-1]) and (cena[-1]>cena[-2]) and (smas_budget["kupiono"]==False) and (smas_budget["BuyPrice"]<cena[-1])):
                 smas_budget["kupiono"]=True
-                smas_budget["1coin"]=(smas_budget["2coin"]/cena[-1])
+                smas_budget["1coin"]=round((smas_budget["2coin"]/cena[-1]),7)
                 smas_budget["2coin"]=0
                 print("SMAS_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],smas_budget["1coin"],smas_budget["2coin"]))
             else:
@@ -211,12 +211,12 @@ while True:
             if ((cena[-1]>ema[-1]) and (cena[-1]<cena[-2]) and ema_budget["kupiono"]==True):
                 ema_budget["kupiono"]=False
                 ema_budget["BuyPrice"]=cena[-1]
-                ema_budget["2coin"]=(ema_budget["1coin"]*cena[-1])
+                ema_budget["2coin"]=round((ema_budget["1coin"]*cena[-1]),2)
                 ema_budget["1coin"]=0
                 print("EMA_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema_budget["1coin"],ema_budget["2coin"]))
             elif ((cena[-1]<ema[-1]) and (cena[-1]>cena[-2]) and (ema_budget["kupiono"]==False) and (ema_budget["BuyPrice"]<cena[-1])):
                 ema_budget["kupiono"]=True
-                ema_budget["1coin"]=(ema_budget["2coin"]/cena[-1])
+                ema_budget["1coin"]=round((ema_budget["2coin"]/cena[-1]),7)
                 ema_budget["2coin"]=0
                 print("EMA_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema_budget["1coin"],ema_budget["2coin"]))
             else:
@@ -227,12 +227,12 @@ while True:
             if ((cena[-1]>ema2[-1]) and (cena[-1]<cena[-2]) and ema2_budget["kupiono"]==True):
                 ema2_budget["kupiono"]=False
                 ema2_budget["BuyPrice"]=cena[-1]
-                ema2_budget["2coin"]=(ema2_budget["1coin"]*cena[-1])
+                ema2_budget["2coin"]=round((ema2_budget["1coin"]*cena[-1]),2)
                 ema2_budget["1coin"]=0
                 print("ema2_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema2_budget["1coin"],ema2_budget["2coin"]))
             elif ((cena[-1]<ema2[-1]) and (cena[-1]>cena[-2]) and (ema2_budget["kupiono"]==False)  and (ema2_budget["BuyPrice"]<cena[-1])):
                 ema2_budget["kupiono"]=True
-                ema2_budget["1coin"]=(ema2_budget["2coin"]/cena[-1])
+                ema2_budget["1coin"]=round((ema2_budget["2coin"]/cena[-1]),7)
                 ema2_budget["2coin"]=0
                 print("ema2_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema2_budget["1coin"],ema2_budget["2coin"]))
             else:
@@ -243,12 +243,12 @@ while True:
             if ((cena[-1]>ema3[-1]) and (cena[-1]<cena[-2]) and ema3_budget["kupiono"]==True):
                 ema3_budget["kupiono"]=False
                 ema3_budget["BuyPrice"]=cena[-1]
-                ema3_budget["2coin"]=(ema3_budget["1coin"]*cena[-1])
+                ema3_budget["2coin"]=round((ema3_budget["1coin"]*cena[-1]),2)
                 ema3_budget["1coin"]=0
                 print("ema3_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema3_budget["1coin"],ema3_budget["2coin"]))
             elif ((cena[-1]<ema3[-1]) and (cena[-1]>cena[-2]) and (ema3_budget["kupiono"]==False) and (ema3_budget["BuyPrice"]<cena[-1])):
                 ema3_budget["kupiono"]=True
-                ema3_budget["1coin"]=(ema3_budget["2coin"]/cena[-1])
+                ema3_budget["1coin"]=round((ema3_budget["2coin"]/cena[-1]),7)
                 ema3_budget["2coin"]=0
                 print("ema3_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema3_budget["1coin"],ema3_budget["2coin"]))
             else:
@@ -259,12 +259,12 @@ while True:
             if ((cena[-1]>ema4[-1]) and (cena[-1]<cena[-2]) and ema4_budget["kupiono"]==True):
                 ema4_budget["kupiono"]=False
                 ema4_budget["BuyPrice"]=cena[-1]
-                ema4_budget["2coin"]=(ema4_budget["1coin"]*cena[-1])
+                ema4_budget["2coin"]=round((ema4_budget["1coin"]*cena[-1]),2)
                 ema4_budget["1coin"]=0
                 print("ema4_SELL @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema4_budget["1coin"],ema4_budget["2coin"]))
             elif ((cena[-1]<ema4[-1]) and (cena[-1]>cena[-2]) and (ema4_budget["kupiono"]==False) and (ema4_budget["BuyPrice"]<cena[-1])):
                 ema4_budget["kupiono"]=True
-                ema4_budget["1coin"]=(ema4_budget["2coin"]/cena[-1])
+                ema4_budget["1coin"]=round((ema4_budget["2coin"]/cena[-1]),7)
                 ema4_budget["2coin"]=0
                 print("ema4_BUY @ Price {} current budget {} 1coin. {} 2coin".format(cena[-1],ema4_budget["1coin"],ema4_budget["2coin"]))
             else:
