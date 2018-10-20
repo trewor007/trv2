@@ -172,25 +172,25 @@ class StockIndicators():
             return 50 
 def clear():
     os.system('cls')
-smas_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema_budget=     [{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}]
-smas_budget2=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema_budget2=     [{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}]
-ema=[[],[],[],[]]
+
 b=False
-cena=[]
-czas=[]
-smas=[]
 zakres=[10, 20, 40, 80]
 
 Si=StockIndicators()
-print("Podaj pare walut ktore chcesz wykorzystac")
-a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] [5 ETH-BTC] [6 BCH-BTC] [7 BCH-EUR]"))
+a=int(input("[1 EUR][2 BTC]"))
 if a==1:
     produkty=["BTC-EUR", "ETH-EUR", "ETC-EUR", "LTC-EUR", "BCH-EUR", "ZRX-EUR"]
 elif a==2:
     produkty=["ETH-BTC", "ETC-BTC", "LTC-BTC", "BCH-BTC", "ZRX-BTC"]
-
+cena=[[] for _ in range(len(produkty))]
+smas=[[] for _ in range(len(produkty))]
+rsi= [[] for _ in range(len(produkty))]
+ema= [[] for _ in range(len(zakres))]
+ema= [ema.copy() for _ in range(len(produkty))]
+smas_budget=[{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0} for _ in range(len(produkty))]
+smas_budget2=[{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0} for _ in range(len(produkty))]
+ema_budget=[smas_budget for _ in range(len(zakres))] #powinno być z zakresu
+ema_budget2=[smas_budget for _ in range(len(zakres))]
 webs=MyWebsocket(produkty=produkty)
 webs.start()  
 while True:
@@ -199,75 +199,77 @@ while True:
         typ=dane.get('type',None)
         if typ=='ticker':
             price=dane.get('price', None)
+            pair=dane.get('product_id',None)
             t=dane.get('time', None)
             b=True
     if b==True:
         alfa=time.time()
         b=False
-        cena.append(float(price))
+        produkt_id=produkty.index(pair)
+        cena[produkt_id].append(float(price))
         #czas.append(t)
-        if len(cena)>zakres[0]:
+        if len(cena[produkt_id])>zakres[0]:
             clear()
-            smas=Si.SI_sma(cena=cena, zakres=zakres[0])                 
-            rsi=Si.SI_RSI(cena=cena)
+            smas[produkt_id]=Si.SI_sma(cena=cena[produkt_id], zakres=zakres[0])                 
+            rsi[produkt_id]=Si.SI_RSI(cena=cena[produkt_id])
             print("===========================================================")
-            print("Rsi: {}. Cena Size: {}".format(rsi, len(cena)))
-            if ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and (smas_budget["kupiono"]==True) and (smas_budget["BuyPrice"]<cena[-1])): #sprzedawanie
-                smas_budget["kupiono"]=False       
-                smas_budget["2coin"]=round((smas_budget["1coin"]*cena[-1]),2)
-                smas_budget["1coin"]=float(0)
-                print("SMAS_SELL          @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget["1coin"],smas_budget["2coin"]))
-            elif ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and (rsi<30) and (smas_budget2["kupiono"]==True) and (smas_budget2["BuyPrice"]<cena[-1])): #sprzedawanie rsi
-                smas_budget2["kupiono"]=False
-                smas_budget2["2coin"]=round((smas_budget2["1coin"]*cena[-1]),2)
-                smas_budget2["1coin"]=float(0)
-                print("SMAS_SELL RSI       @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget2["1coin"],smas_budget2["2coin"]))
-            elif ((cena[-1]<smas[-1]) and (cena[-1]>cena[-2]) and (smas_budget["kupiono"]==False) ): #kupowanie
-                smas_budget["kupiono"]=True
-                smas_budget["BuyPrice"]=cena[-1]
-                smas_budget["1coin"]=round((smas_budget["2coin"]/cena[-1]),7)
-                smas_budget["2coin"]=float(0)
-                print("SMAS_BUY           @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget2["1coin"],smas_budget2["2coin"]))
-            elif ((cena[-1]<smas[-1]) and (cena[-1]>cena[-2]) and (rsi>70) and (smas_budget2["kupiono"]==False) ): #kupowanie rsi
-                smas_budget2["kupiono"]=True
-                smas_budget2["BuyPrice"]=cena[-1]
-                smas_budget2["1coin"]=round((smas_budget2["2coin"]/cena[-1]),7)
-                smas_budget2["2coin"]=float(0)
-                print("SMAS_BUY     RSI   @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget["1coin"],smas_budget["2coin"]))
+            print("Rsi: {}. Cena Size: {}".format(rsi[produkt_id], len(cena[produkt_id])))
+            if ((cena[produkt_id][-1]>smas[produkt_id][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (smas_budget[produkt_id]["kupiono"]==True) and (smas_budget[produkt_id]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie
+                smas_budget[produkt_id]["kupiono"]=False       
+                smas_budget[produkt_id]["2coin"]=round((smas_budget[produkt_id]["1coin"]*cena[produkt_id][-1]),2)
+                smas_budget[produkt_id]["1coin"]=float(0)
+                print("SMAS_SELL          @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[produkt_id][-1],smas_budget[produkt_id]["1coin"],smas_budget[produkt_id]["2coin"]))
+            elif ((cena[produkt_id][-1]>smas[produkt_id][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (rsi[produkt_id]<30) and (smas_budget2[produkt_id]["kupiono"]==True) and (smas_budget2[produkt_id]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie rsi
+                smas_budget2[produkt_id]["kupiono"]=False
+                smas_budget2[produkt_id]["2coin"]=round((smas_budget2[produkt_id]["1coin"]*cena[produkt_id][-1]),2)
+                smas_budget2[produkt_id]["1coin"]=float(0)
+                print("SMAS_SELL RSI       @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[produkt_id][-1],smas_budget2[produkt_id]["1coin"],smas_budget2[produkt_id]["2coin"]))
+            elif ((cena[produkt_id][-1]<smas[produkt_id][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (smas_budget[produkt_id]["kupiono"]==False) ): #kupowanie
+                smas_budget[produkt_id]["kupiono"]=True
+                smas_budget[produkt_id]["BuyPrice"]=cena[produkt_id][-1]
+                smas_budget[produkt_id]["1coin"]=round((smas_budget[produkt_id]["2coin"]/cena[produkt_id][-1]),7)
+                smas_budget[produkt_id]["2coin"]=float(0)
+                print("SMAS_BUY           @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[produkt_id][-1],smas_budget2[produkt_id]["1coin"],smas_budget2[produkt_id]["2coin"]))
+            elif ((cena[produkt_id][-1]<smas[produkt_id][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (rsi[produkt_id]>70) and (smas_budget2[produkt_id]["kupiono"]==False) ): #kupowanie rsi
+                smas_budget2[produkt_id]["kupiono"]=True
+                smas_budget2[produkt_id]["BuyPrice"]=cena[produkt_id][-1]
+                smas_budget2[produkt_id]["1coin"]=round((smas_budget2[produkt_id]["2coin"]/cena[produkt_id][-1]),7)
+                smas_budget2[produkt_id]["2coin"]=float(0)
+                print("SMAS_BUY     RSI   @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[produkt_id][-1],smas_budget[produkt_id]["1coin"],smas_budget[produkt_id]["2coin"]))
             else:
-                print("SMAS_PASS                      budget  {:.7f} 1coin.   {} 2coin".format(smas_budget["1coin"],smas_budget["2coin"]))
-                print("SMAS_PASS    RSI               budget  {:.7f} 1coin.   {} 2coin".format(smas_budget2["1coin"],smas_budget2["2coin"]))
+                print("SMAS_PASS                      budget  {:.7f} 1coin.   {} 2coin".format(smas_budget[produkt_id]["1coin"],smas_budget[produkt_id]["2coin"]))
+                print("SMAS_PASS    RSI              budget  {:.7f} 1coin.   {} 2coin".format(smas_budget2[produkt_id]["1coin"],smas_budget2[produkt_id]["2coin"]))
             for i in zakres:                
-                if len(cena)>i:
+                if len(cena[produkt_id])>i:
                     j=zakres.index(i)
-                    e=Si.SI_ema(cena=cena, zakres=i)
+                    e=Si.SI_ema(cena=cena[produkt_id], zakres=i)
                     k=e.tolist()
-                    ema[j].append(k[-1])
-                    if ((cena[-1]>ema[j][-1]) and (cena[-1]<cena[-2]) and (ema_budget[j]["kupiono"]==True) and (ema_budget[j]["BuyPrice"]<cena[-1])): #sprzedawanie
-                        ema_budget[j]["kupiono"]=False
-                        ema_budget[j]["2coin"]=round((ema_budget[j]["1coin"]*cena[-1]),2)
-                        ema_budget[j]["1coin"]=float(0)
-                        print("EMA{}_SELL          @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                    elif ((cena[-1]>ema[j][-1]) and (cena[-1]<cena[-2]) and (rsi<30) and (ema_budget2[j]["kupiono"]==True) and (ema_budget2[j]["BuyPrice"]<cena[-1])): #sprzedawanie rsi
-                        ema_budget2[j]["kupiono"]=False
-                        ema_budget2[j]["2coin"]=round((ema_budget2[j]["1coin"]*cena[-1]),2)
-                        ema_budget2[j]["1coin"]=float(0)
-                        print("EMA{}_SELL  RSI     @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                    elif ((cena[-1]<ema[j][-1]) and (cena[-1]>cena[-2]) and (ema_budget[j]["kupiono"]==False) ): #kupowanie
-                        ema_budget[j]["kupiono"]=True
-                        ema_budget[j]["BuyPrice"]=cena[-1]
-                        ema_budget[j]["1coin"]=round((ema_budget[j]["2coin"]/cena[-1]),7)
-                        ema_budget[j]["2coin"]=float(0)
-                        print("EMA{}_BUY           @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                    elif ((cena[-1]<ema[j][-1]) and (cena[-1]>cena[-2]) and (rsi>70) and (ema_budget2[j]["kupiono"]==False) ): #kupowanie rsi
-                        ema_budget2[j]["kupiono"]=True
-                        ema_budget2[j]["BuyPrice"]=cena[-1]
-                        ema_budget2[j]["1coin"]=round((ema_budget2[j]["2coin"]/cena[-1]),7)
-                        ema_budget2[j]["2coin"]=float(0)
-                        print("EMA{}_BUY    RSI    @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget2[j]["1coin"],ema_budget2[j]["2coin"]))
+                    ema[produkt_id][j].append(k[-1])
+                    if ((cena[produkt_id][-1]>ema[produkt_id][j][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (ema_budget[j][produkt_id]["kupiono"]==True) and (ema_budget[j][produkt_id]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie
+                        ema_budget[j][produkt_id]["kupiono"]=False
+                        ema_budget[j][produkt_id]["2coin"]=round((ema_budget[j][produkt_id]["1coin"]*cena[produkt_id][-1]),2)
+                        ema_budget[j][produkt_id]["1coin"]=float(0)
+                        print("EMA{}_SELL          @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[produkt_id][-1],ema_budget[j][produkt_id]["1coin"],ema_budget[j][produkt_id]["2coin"]))
+                    elif ((cena[produkt_id][-1]>ema[produkt_id][j][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (rsi[produkt_id]<30) and (ema_budget2[j][produkt_id]["kupiono"]==True) and (ema_budget2[j][produkt_id]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie rsi
+                        ema_budget2[j][produkt_id]["kupiono"]=False
+                        ema_budget2[j][produkt_id]["2coin"]=round((ema_budget2[j][produkt_id]["1coin"]*cena[produkt_id][-1]),2)
+                        ema_budget2[j][produkt_id]["1coin"]=float(0)
+                        print("EMA{}_SELL  RSI     @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[produkt_id][-1],ema_budget[j][produkt_id]["1coin"],ema_budget[j][produkt_id]["2coin"]))
+                    elif ((cena[produkt_id][-1]<ema[produkt_id][j][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (ema_budget[j][produkt_id]["kupiono"]==False) ): #kupowanie
+                        ema_budget[j][produkt_id]["kupiono"]=True
+                        ema_budget[j][produkt_id]["BuyPrice"]=cena[produkt_id][-1]
+                        ema_budget[j][produkt_id]["1coin"]=round((ema_budget[j][produkt_id]["2coin"]/cena[produkt_id][-1]),7)
+                        ema_budget[j][produkt_id]["2coin"]=float(0)
+                        print("EMA{}_BUY           @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[produkt_id][-1],ema_budget[j][produkt_id]["1coin"],ema_budget[j][produkt_id]["2coin"]))
+                    elif ((cena[produkt_id][-1]<ema[produkt_id][j][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (rsi[produkt_id]>70) and (ema_budget2[j][produkt_id]["kupiono"]==False) ): #kupowanie rsi
+                        ema_budget2[j][produkt_id]["kupiono"]=True
+                        ema_budget2[j][produkt_id]["BuyPrice"]=cena[produkt_id][-1]
+                        ema_budget2[j][produkt_id]["1coin"]=round((ema_budget2[j][produkt_id]["2coin"]/cena[produkt_id][-1]),7)
+                        ema_budget2[j][produkt_id]["2coin"]=float(0)
+                        print("EMA{}_BUY    RSI    @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[produkt_id][-1],ema_budget2[j][produkt_id]["1coin"],ema_budget2[j][produkt_id]["2coin"]))
                     else:
-                        print("EMA{}_PASS                      budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                        print("EMA{}_PASS   RSI                budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget2[j]["1coin"],ema_budget2[j]["2coin"]))
+                        print("EMA{}_PASS                      budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget[j][produkt_id]["1coin"],ema_budget[j][produkt_id]["2coin"]))
+                        print("EMA{}_PASS   RSI                budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget2[j][produkt_id]["1coin"],ema_budget2[j][produkt_id]["2coin"]))
         else:
             pass
         beta=(time.time()-alfa)
