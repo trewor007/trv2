@@ -8,7 +8,6 @@ import urllib.request
 import requests
 import queue
 import os
-
 import numpy as np
 import threading as Thread
 from websocket import create_connection, WebSocketConnectionClosedException
@@ -79,7 +78,6 @@ class MyWebsocket(object):
     def on_error(self, e):
         with open('error.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
-
 class Requester():
     def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
