@@ -186,22 +186,22 @@ class Bots():
                 Si=StockIndicators()
                 smas=Si.SI_sma(cena=self.cena, zakres=zakres)                
                 ema=Si.SI_ema(cena=self.cena, zakres=zakres)
-                if len(self.cena)<zakres2:
-                    print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
+                diff=np.around((smas[-1])-(ema[-1]),6)
 
+                if len(self.cena)<=zakres2:
+                    print('smas: {} ema: {} '.format(round(smas[-1],6),round(ema[-1],6)))
+                    print('smas/ema:{}'.format(diff))                 
             if len(self.cena)>zakres2:
                 ema2=Si.SI_ema(cena=self.cena, zakres=zakres2)
-                if len(self.cena)<zakres3:
-                    print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),ema2[-1]))
-
+                if len(self.cena)<=zakres3:
+                    print('smas: {} ema: {} ema2: {} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6)))                    
             if len(self.cena)>zakres3:
                 ema3=Si.SI_ema(cena=self.cena, zakres=zakres3)
-                if len(self.cena)<zakres4:
-                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))
-
+                if len(self.cena)<=zakres4:
+                    print('smas: {} ema: {} ema2: {} ema3:{} '.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6)))                    
             if len(self.cena)>zakres4:
                 ema4=Si.SI_ema(cena=self.cena, zakres=zakres4)
-                print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema[-1],6),round(ema4[-1],6)))
+                print('smas: {} ema: {} ema2: {} ema3:{} ema4: {}'.format(round(smas[-1],6),round(ema[-1],6),round(ema2[-1],6),round(ema3[-1],6),round(ema4[-1],6)))
             #
             #    if self.cena[-1]>smas[-1]:
             #        print("sprzedaje")
