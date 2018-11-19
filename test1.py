@@ -1,16 +1,34 @@
-import time
-import datetime
-import json
-import sqlite3
-import urllib3
-import timeit
-import urllib.request
-import requests
-from websocket import create_connection, WebSocketConnectionClosedException
+import copy
+zakres=[5, 10, 15]
+produkty=["BTC-EUR", "ETH-EUR"]
+ema0= [[].copy() for _ in range(len(zakres))]
+ema= [ema0.copy() for _ in range(len(produkty))]
+print(ema)
+ema[0][0].append("1")
+ema[0][1].append("2")
+ema[0][0].append("1")
+print(ema)
 
-ws=create_connection("wss://ws-feed.gdax.com")
-kanaly=["ticker"]
-produkty=['LTC-BTC']
-ws.send(json.dumps({'type': 'subscribe', 'product_ids': produkty, 'channels': [{"name": kanaly, 'product_ids': produkty,}]}))
-ping=ws.ping("pong")
-print(ping)
+ema0= [[].copy() for _ in range(len(zakres))]
+ema= [copy.deepcopy(ema0) for _ in range(len(produkty))]
+print(ema)
+ema[0][0].append("1")
+ema[0][1].append("2")
+ema[0][0].append("1")
+print(ema)
+
+ema0= [[] for _ in range(len(zakres))]
+ema= [copy.deepcopy(ema0) for _ in range(len(produkty))]
+print(ema)
+ema[0][0].append("1")
+ema[0][1].append("2")
+ema[0][0].append("1")
+print(ema)
+
+ema= [[] for _ in range(len(zakres))]
+ema= [copy.deepcopy(ema) for _ in range(len(produkty))]
+print(ema)
+ema[0][0].append("1")
+ema[0][1].append("2")
+ema[0][0].append("1")
+print(ema)
