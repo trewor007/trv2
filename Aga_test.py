@@ -93,8 +93,8 @@ class Requester():
         self.start=start
         self.end=end
     def _get(self, path, params= None, ):
-        r= requests.get(self.url + path, params=params, timeout=self.timeout).json()
-        self.Printer(r)
+        respond= requests.get(self.url + path, params=params, timeout=self.timeout).json()
+        return respond
     def Historic_rates_divider(self, x=300):
         if self.end-self.start > x*self.skala:
             self.end_tmp=self.end
@@ -127,7 +127,7 @@ class Requester():
                 self.skala = nowa_skala
             parametry['granularity']= self.skala
         self._get('/products/{}/candles'.format(str(self.produkty[0])), params=parametry)
-    def Printer(self, r=None):
+    #def Printer(self, r=None):
         i=0
         while i < len(r):
             c.execute("INSERT INTO Candles(product_id, time, low, high, open, close, volume) VALUES(?,?,?,?,?,?,?)", (self.produkty[0], r[i][0], r[i][1], r[i][2], r[i][3], r[i][4], r[i][5]))
@@ -278,7 +278,7 @@ while True:
                         wallet[pair[4:]]=round(wallet[pair[4:]]-(ema_budget2[produkt_id][j]['coin_amount']*cena[produkt_id][-1]),7)
                         ema_budget2[produkt_id][j]["Sentence"]=("EMA{}_BUY RSI  {} {}@ Price {}".format((j+1),ema_budget2[produkt_id][j]["coin_amount"],pair[:3],cena[produkt_id][-1]))
                     else:
-                        pass
+                        pass 
             for x in range(len(produkty)):
                 print(smas_budget[x]["Sentence"],smas_budget2[x]["Sentence"])               
                 for y in range(len(zakres)):

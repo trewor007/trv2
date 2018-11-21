@@ -74,7 +74,7 @@ if a==1:
 elif a==2:
     produkty=["ETH-BTC"]
 wallet={'EUR':float(200),'BTC':float(0),'ETH':float(0),'ETC':float(0),'LTC':float(0),'BCH':float(0), 'ZRX':float(0)}
-cena=[[] for _ in range(len(produkty))]
+cena=[[0] for _ in range(len(produkty))]
 smas=[[] for _ in range(len(produkty))]
 rsi= [[] for _ in range(len(produkty))]
 ema= [[] for _ in range(len(zakres))]
@@ -93,27 +93,22 @@ fig, ax=plt.subplots()
 x=[0]
 y=[0]
 y1=[0]
+y2=[0]
 p1, =ax.plot(x,y, label='cena')
-p2, =ax.plot(x,y1, label='czas pracy')
+p2, =ax.plot(x,y1, label='cena2')
+p3, =ax.plot(x,y2, label='czas pracy')
 plt.xlabel('czas')
 plt.ylabel('cena')
 plt.title('wykres')
 plt.legend()
 plt.show(block=False)
-def animate(i):
-        
-        ax1.clear()
-        ax2.clear()
-        ax1.plot(czas,cena[0])
-        ax2.plot(czas,beta)
-    
-    
+
 while True:
     time.sleep(1)
     alpfa=time.time()
     #input('press enter')
     rand_produkt=random.choice(produkty) 
-    rand_price=random.randint(1,5)
+    rand_price=random.uniform(1.0, 5.0)
     rand_czas=time.ctime()
     alfa={'type':'ticker', 'price':rand_price, 'product_id':rand_produkt, 'time':rand_czas}
     q.put(alfa)
@@ -133,10 +128,12 @@ while True:
         czas.append(t)
 
     x.append(x[-1]+.1)#nie wiem czy to potrzebne skoro dosłownie linijke wyżej robie to samo
-    y.append(cena[produkt_id][-1])
-    y1.append(beta[-1])
+    y.append(cena[0][-1])
+    y1.append(cena[1][-1])
+    y2.append(beta[-1])
     p1.set_data(x,y)
     p2.set_data(x,y1)
+    p3.set_data(x,y2)
     ax.relim()
     ax.autoscale_view()
     plt.pause(1e-3)
