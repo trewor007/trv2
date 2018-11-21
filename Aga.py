@@ -78,9 +78,12 @@ class MyWebsocket(object):
         if self.should_print:
             print("\n-- Socket Closed --")            
     def on_error(self, e):
-        with open('error.txt','a') as txt_file:
+        print(e)
+        with open('error_run_forever.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
-
+        
+        webs=MyWebsocket(produkty=produkty)
+        webs.start() 
 class Requester():
     def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
@@ -90,8 +93,8 @@ class Requester():
         self.start=start
         self.end=end
     def _get(self, path, params= None, ):
-        r= requests.get(self.url + path, params=params, timeout=self.timeout).json()
-        self.Printer(r)
+        respond= requests.get(self.url + path, params=params, timeout=self.timeout).json()
+        return respond
     def Historic_rates_divider(self, x=300):
         if self.end-self.start > x*self.skala:
             self.end_tmp=self.end
@@ -124,7 +127,7 @@ class Requester():
                 self.skala = nowa_skala
             parametry['granularity']= self.skala
         self._get('/products/{}/candles'.format(str(self.produkty[0])), params=parametry)
-    def Printer(self, r=None):
+    #def Printer(self, r=None):
         i=0
         while i < len(r):
             c.execute("INSERT INTO Candles(product_id, time, low, high, open, close, volume) VALUES(?,?,?,?,?,?,?)", (self.produkty[0], r[i][0], r[i][1], r[i][2], r[i][3], r[i][4], r[i][5]))
@@ -183,19 +186,20 @@ if a==1:
     produkty=["BTC-EUR", "ETH-EUR", "ETC-EUR", "LTC-EUR", "BCH-EUR", "ZRX-EUR"]
 elif a==2:
     produkty=["ETH-BTC", "ETC-BTC", "LTC-BTC", "BCH-BTC", "ZRX-BTC"]
+wallet={'EUR':float(200),'BTC':float(0),'ETH':float(0),'ETC':float(0),'LTC':float(0),'BCH':float(0), 'ZRX':float(0)}
 cena=[[] for _ in range(len(produkty))]
 smas=[[] for _ in range(len(produkty))]
 rsi= [[] for _ in range(len(produkty))]
 ema= [[] for _ in range(len(zakres))]
 ema= [copy.deepcopy(ema) for _ in range(len(produkty))]
-smas_budget=[{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
-smas_budget2=[{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
-ema_zakres=[{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
-ema_zakres2=[{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
+smas_budget=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
+smas_budget2=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
+ema_zakres=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
+ema_zakres2=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
 ema_budget=[copy.deepcopy(ema_zakres) for _ in range(len(produkty))]
 ema_budget2=[copy.deepcopy(ema_zakres2) for _ in range(len(produkty))]
 webs=MyWebsocket(produkty=produkty)
-webs.start()  
+webs.start() 
 while True:
     if q.not_empty:            
         dane=q.get()        
@@ -219,30 +223,30 @@ while True:
             print("Pair: {} Rsi: {}. Cena Size: {}".format(pair, rsi[produkt_id], len(cena[produkt_id])))
             if ((cena[produkt_id][-1]>smas[produkt_id][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (smas_budget[produkt_id]["kupiono"]==True) and (smas_budget[produkt_id]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie
                 smas_budget[produkt_id]["kupiono"]=False       
-                smas_budget[produkt_id]["2coin"]=round((smas_budget[produkt_id]["1coin"]*cena[produkt_id][-1]),2)
-                smas_budget[produkt_id]["1coin"]=float(0)
-                smas_budget[produkt_id]["Sentence"]=("SMAS_SELL          @ Price {}  budget  {:.7f} {} {}".format(cena[produkt_id][-1],smas_budget[produkt_id]["1coin"], pair, smas_budget[produkt_id]["2coin"]))
+                wallet[pair[4:]]=round(wallet[pair[4:]]+(smas_budget[produkt_id]['coin_amount']*cena[produkt_id][-1]),2)
+                smas_budget[produkt_id]["Sentence"]=("SMAS_SELL {} {}@ Price: {}  Buyprice: {} ".format(smas_budget[produkt_id]["coin_amount"],pair[:3],cena[produkt_id][-1],smas_budget[produkt_id]['BuyPrice']))
+                smas_budget[produkt_id]["coin_amount"]=float(0)
+                smas_budget[produkt_id]['BuyPrice']=float(0)
             elif ((cena[produkt_id][-1]>smas[produkt_id][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (rsi[produkt_id]<30) and (smas_budget2[produkt_id]["kupiono"]==True) and (smas_budget2[produkt_id]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie rsi
                 smas_budget2[produkt_id]["kupiono"]=False
-                smas_budget2[produkt_id]["2coin"]=round((smas_budget2[produkt_id]["1coin"]*cena[produkt_id][-1]),2)
-                smas_budget2[produkt_id]["1coin"]=float(0)
-                smas_budget2[produkt_id]["Sentence"]=("SMAS_SELL RSI       @ Price {}  budget  {:.7f} {} {}".format(cena[produkt_id][-1],smas_budget2[produkt_id]["1coin"], pair, smas_budget2[produkt_id]["2coin"]))
+                wallet[pair[4:]]=round(wallet[pair[4:]]+(smas_budget2[produkt_id]['coin_amount']*cena[produkt_id][-1]),2)
+                smas_budget2[produkt_id]["Sentence"]=("SMAS_SELL RSI {} {}@ Price: {} Buyprice: {}".format(smas_budget2[produkt_id]["coin_amount"],pair[:3],cena[produkt_id][-1],smas_budget2[produkt_id]['BuyPrice']))
+                smas_budget2[produkt_id]["coin_amount"]=float(0)
+                smas_budget2[produkt_id]['BuyPrice']=float(0)
             elif ((cena[produkt_id][-1]<smas[produkt_id][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (smas_budget[produkt_id]["kupiono"]==False) ): #kupowanie
                 smas_budget[produkt_id]["kupiono"]=True
                 smas_budget[produkt_id]["BuyPrice"]=cena[produkt_id][-1]
-                smas_budget[produkt_id]["1coin"]=round((smas_budget[produkt_id]["2coin"]/cena[produkt_id][-1]),7)
-                smas_budget[produkt_id]["2coin"]=float(0)
-                smas_budget[produkt_id]["Sentence"]=("SMAS_BUY           @ Price {}  budget  {:.7f} {} {}".format(cena[produkt_id][-1],smas_budget[produkt_id]["1coin"], pair, smas_budget[produkt_id]["2coin"]))
+                smas_budget[produkt_id]['coin_amount']=round(((0.1*wallet[pair[4:]])/cena[produkt_id][-1]),7)
+                wallet[pair[4:]]=round(wallet[pair[4:]]-(smas_budget[produkt_id]['coin_amount']*cena[produkt_id][-1]),7)
+                smas_budget[produkt_id]["Sentence"]=("SMAS_BUY  {} {}@ Price {}".format(smas_budget[produkt_id]["coin_amount"],pair[:3],cena[produkt_id][-1]))
             elif ((cena[produkt_id][-1]<smas[produkt_id][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (rsi[produkt_id]>70) and (smas_budget2[produkt_id]["kupiono"]==False) ): #kupowanie rsi
                 smas_budget2[produkt_id]["kupiono"]=True
                 smas_budget2[produkt_id]["BuyPrice"]=cena[produkt_id][-1]
-                smas_budget2[produkt_id]["1coin"]=round((smas_budget2[produkt_id]["2coin"]/cena[produkt_id][-1]),7)
-                smas_budget2[produkt_id]["2coin"]=float(0)
-                smas_budget2[produkt_id]["Sentence"]=("SMAS_BUY     RSI   @ Price {}  budget  {:.7f} {} {}".format(cena[produkt_id][-1],smas_budget[produkt_id]["1coin"], pair, smas_budget2[produkt_id]["2coin"]))
+                smas_budget2[produkt_id]['coin_amount']=round(((0.1*wallet[pair[4:]])/cena[produkt_id][-1]),7)
+                wallet[pair[4:]]=round(wallet[pair[4:]]-(smas_budget2[produkt_id]['coin_amount']*cena[produkt_id][-1]),7)
+                smas_budget[produkt_id]["Sentence"]=("SMAS_BUY RSI  {} {}@ Price {}".format(smas_budget2[produkt_id]["coin_amount"],pair[:3],cena[produkt_id][-1]))
             else:
                 pass
-                #print("SMAS_PASS                      budget  {:.7f} 1coin.   {} 2coin".format(smas_budget[produkt_id]["1coin"],smas_budget[produkt_id]["2coin"]))
-                #print("SMAS_PASS   RSI                budget  {:.7f} 1coin.   {} 2coin".format(smas_budget2[produkt_id]["1coin"],smas_budget2[produkt_id]["2coin"]))
             for i in zakres:                
                 if len(cena[produkt_id])>i:
                     j=zakres.index(i)
@@ -251,38 +255,37 @@ while True:
                     ema[produkt_id][j].append(k[-1])
                     if ((cena[produkt_id][-1]>ema[produkt_id][j][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (ema_budget[produkt_id][j]["kupiono"]==True) and (ema_budget[produkt_id][j]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie
                         ema_budget[produkt_id][j]["kupiono"]=False
-                        ema_budget[produkt_id][j]["2coin"]=round((ema_budget[produkt_id][j]["1coin"]*cena[produkt_id][-1]),2)
-                        ema_budget[produkt_id][j]["1coin"]=float(0)
-                        ema_budget[produkt_id][j]["Sentence"]=("EMA{}_SELL          @ Price {}  budget  {:.7f} {} {}".format((j+1),cena[produkt_id][-1],ema_budget[produkt_id][j]["1coin"], pair, ema_budget[produkt_id][j]["2coin"]))
+                        wallet[pair[4:]]=round(wallet[pair[4:]]+(ema_budget[produkt_id][j]['coin_amount']*cena[produkt_id][-1]),2)
+                        ema_budget[produkt_id][j]["Sentence"]=("EMA{}_SELL {} {}@ Price: {}  Buyprice: {} ".format((j+1),ema_budget[produkt_id][j]["coin_amount"],pair[:3],cena[produkt_id][-1],ema_budget[produkt_id][j]['BuyPrice']))
+                        ema_budget[produkt_id][j]["coin_amount"]=float(0)
+                        ema_budget[produkt_id][j]['BuyPrice']=float(0)
                     elif ((cena[produkt_id][-1]>ema[produkt_id][j][-1]) and (cena[produkt_id][-1]<cena[produkt_id][-2]) and (rsi[produkt_id]<30) and (ema_budget2[produkt_id][j]["kupiono"]==True) and (ema_budget2[produkt_id][j]["BuyPrice"]<cena[produkt_id][-1])): #sprzedawanie rsi
                         ema_budget2[produkt_id][j]["kupiono"]=False
-                        ema_budget2[produkt_id][j]["2coin"]=round((ema_budget2[produkt_id][j]["1coin"]*cena[produkt_id][-1]),2)
-                        ema_budget2[produkt_id][j]["1coin"]=float(0)
-                        ema_budget2[produkt_id][j]["Sentence"]=("EMA{}_SELL  RSI     @ Price {}  budget  {:.7f} {} {}".format((j+1),cena[produkt_id][-1],ema_budget[produkt_id][j]["1coin"], pair, ema_budget[produkt_id][j]["2coin"]))
+                        wallet[pair[4:]]=round(wallet[pair[4:]]+(ema_budget2[produkt_id][j]['coin_amount']*cena[produkt_id][-1]),2)
+                        ema_budget2[produkt_id][j]["Sentence"]=("EMA{}_SELL RSI {} {}@ Price: {}  Buyprice: {} ".format((j+1),ema_budget2[produkt_id][j]["coin_amount"],pair[:3],cena[produkt_id][-1],ema_budget2[produkt_id][j]['BuyPrice']))
+                        ema_budget2[produkt_id][j]["coin_amount"]=float(0)
+                        ema_budget2[produkt_id][j]['BuyPrice']=float(0)
                     elif ((cena[produkt_id][-1]<ema[produkt_id][j][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (ema_budget[produkt_id][j]["kupiono"]==False) ): #kupowanie
                         ema_budget[produkt_id][j]["kupiono"]=True
                         ema_budget[produkt_id][j]["BuyPrice"]=cena[produkt_id][-1]
-                        ema_budget[produkt_id][j]["1coin"]=round((ema_budget[produkt_id][j]["2coin"]/cena[produkt_id][-1]),7)
-                        ema_budget[produkt_id][j]["2coin"]=float(0)
-                        ema_budget[produkt_id][j]["Sentence"]=("EMA{}_BUY           @ Price {}  budget  {:.7f} {} {}".format((j+1),cena[produkt_id][-1],ema_budget[produkt_id][j]["1coin"], pair, ema_budget[produkt_id][j]["2coin"]))
+                        ema_budget[produkt_id][j]['coin_amount']=round(((0.1*wallet[pair[4:]])/cena[produkt_id][-1]),7)
+                        wallet[pair[4:]]=round(wallet[pair[4:]]-(ema_budget[produkt_id][j]['coin_amount']*cena[produkt_id][-1]),7)
+                        ema_budget[produkt_id][j]["Sentence"]=("EMA{}_BUY  {} {}@ Price {}".format((j+1),ema_budget[produkt_id][j]["coin_amount"],pair[:3],cena[produkt_id][-1]))
                     elif ((cena[produkt_id][-1]<ema[produkt_id][j][-1]) and (cena[produkt_id][-1]>cena[produkt_id][-2]) and (rsi[produkt_id]>70) and (ema_budget2[produkt_id][j]["kupiono"]==False) ): #kupowanie rsi
                         ema_budget2[produkt_id][j]["kupiono"]=True
                         ema_budget2[produkt_id][j]["BuyPrice"]=cena[produkt_id][-1]
-                        ema_budget2[produkt_id][j]["1coin"]=round((ema_budget2[produkt_id][j]["2coin"]/cena[produkt_id][-1]),7)
-                        ema_budget2[produkt_id][j]["2coin"]=float(0)
-                        ema_budget2[produkt_id][j]["Sentence"]=("EMA{}_BUY    RSI    @ Price {}  budget  {:.7f} {} {}".format((j+1),cena[produkt_id][-1],ema_budget2[produkt_id][j]["1coin"], pair, ema_budget2[produkt_id][j]["2coin"]))
+                        ema_budget2[produkt_id][j]['coin_amount']=round(((0.15*wallet[pair[4:]])/cena[produkt_id][-1]),7)
+                        wallet[pair[4:]]=round(wallet[pair[4:]]-(ema_budget2[produkt_id][j]['coin_amount']*cena[produkt_id][-1]),7)
+                        ema_budget2[produkt_id][j]["Sentence"]=("EMA{}_BUY RSI  {} {}@ Price {}".format((j+1),ema_budget2[produkt_id][j]["coin_amount"],pair[:3],cena[produkt_id][-1]))
                     else:
-                        pass
-                        #print("EMA{}_PASS                      budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget[produkt_id][j]["1coin"],ema_budget[produkt_id][j]["2coin"]))
-                        #print("EMA{}_PASS   RSI                budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget2[produkt_id][j]["1coin"],ema_budget2[produkt_id][j]["2coin"]))
+                        pass 
             for x in range(len(produkty)):
-                print(smas_budget[x]["Sentence"])
-                print(smas_budget2[x]["Sentence"])                
+                print(smas_budget[x]["Sentence"],smas_budget2[x]["Sentence"])               
                 for y in range(len(zakres)):
-                    print(ema_budget[x][y]["Sentence"])        
-                    print(ema_budget2[x][y]["Sentence"])     
+                    print(ema_budget[x][y]["Sentence"],ema_budget2[x][y]["Sentence"])             
         else:
             pass
         beta=(time.time()-alfa)
         print(beta)
+        print(wallet)
 

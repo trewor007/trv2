@@ -9,14 +9,21 @@ import requests
 import queue
 import os
 import copy
-
+import hmac
+import hashlib
+import base64
 import numpy as np
 import threading as Thread
+from requests.auth import AuthBase
+from hashtag_generator import gdax_sandbox_key, gdax_sandbox_API_secret, gdax_sandbox_phassphrase
 from websocket import create_connection, WebSocketConnectionClosedException
 
 conn=sqlite3.connect('bazadanych.db')
 c = conn.cursor()
 q = queue.Queue()
+api_key=gdax_sandbox_key
+secret_key=gdax_sandbox_API_secret
+passphrase=gdax_sandbox_phassphrase
 
 class MyWebsocket(object):
 
@@ -84,6 +91,101 @@ class MyWebsocket(object):
         
         webs=MyWebsocket(produkty=produkty)
         webs.start() 
+class CBProAuth(AuthBase):
+    def __init__(self, api_key, secret_key, passphrase):
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.passphrase = passphrase
+
+    def __call__(self, request):
+        timestamp = str(time.time())
+        message = ''.join([timestamp, request.method, request.path_url, (request.body or '')])
+        request.headers.update(get_auth_headers(timestamp, message, self.api_key, self.secret_key, self.passphrase))
+        return request
+def get_auth_headers(timestamp, message, api_key, secret_key, passphrase):
+    message = message.encode('ascii')
+    hmac_key = base64.b64decode(secret_key)
+    signature = hmac.new(hmac_key, message, hashlib.sha256)
+    signature_b64 = base64.b64encode(signature.digest()).decode('utf-8')
+    return {'Content-Type': 'Application/JSON', 'CB-ACCESS-SIGN': signature_b64, 'CB-ACCESS-TIMESTAMP': timestamp, 'CB-ACCESS-KEY': api_key, 'CB-ACCESS-PASSPHRASE': passphrase}
+class Public_Requester():
+    """
+    Wszystkie zapytania niewymagające logowanie przesyłane są tą klasą
+    """
+    def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None):
+        self.url = url.rstrip('/')
+        self.auth = None
+        self.session = requests.Session()
+        self.timeout = timeout
+        self.produkty= produkty # uwaga! zamiennie używane z product_id. kandydat do usunięcia
+        self.skala=skala        # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
+        self.start=start        # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
+        self.end=end            # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
+
+    def Produkty(self):
+        """
+        Lista możliwych par walutowych
+        """
+        return self._Request('get','/products')
+    def _Request(self, method ,endpoint, params=None, data=None):
+        """
+        Wysyła zapytanie do strony. Po dojściu do tego momentu nastąpi wyjście z klasy
+
+            Wejście:
+                    method (str):   Metoda HTTP (get, post, delete)
+                    endpoint (str): końcówka adresu HTTP odpowiednia do zapytania
+                    params (dict):  dodatkowe parametry do zapytania HTTP (opcionalne)
+                    data (str):     parametry w formacie JSON do zapytania HTTP typu POST (opcionalne)
+            Wyjście:
+                    odpowiedz w formacie JSON (list/dict)
+        """
+        url=self.url+endpoint
+        r=self.session.request(method, url, params=params, data=data, auth=self.auth, timeout=30)
+        return r.json()
+class Private_Requester(Public_Requester):
+    """
+    Wszystkie zapytania po zalogowaniu przesyłane są tą klasą(jeżeli w nawiasie powyżej jest "Public_Pequester" to zapytania z tej klasy są obsługiwane przez _Requester z tamtej klasy
+    """
+    def __init__(self, api_key, secret_key, passphrase, url='https://api.pro.coinbase.com'):
+        super(Private_Requester, self).__init__(url)
+        self.auth=CBProAuth(api_key, secret_key, passphrase)
+        self.session=requests.session()
+    def get_konto(self, account_id):
+        """
+        Pobiera informacje na temat pojedyńczego konta
+
+        Wejście:
+                account_id (str): nazwa poszukiwanego konta
+        Wyjście:
+                Dane konta (dict)
+        """
+        return self._Request('get','/accounts/'+account_id)
+
+    def get_konta(self):
+        """
+        jw tylko dla wielu
+        """
+        return self.get_konto('')
+    def zlecenie(self, product_id, side, order_type, **kwargs):
+        """
+        Składanie zamówienia. główny konstruktor wszystkie rodzaje zamówień składane są tutaj po czym przechodzą do innej klasy gdzie są wysyłane
+
+        Wejście:
+                produkty (str): para produktów na której składamy zamówienie[BTC-EUR]
+                side (str): 'buy'/'sell'
+        DO UZUPEŁNIENIE!!!
+        """
+        params={'product_id':product_id, 'side':side, 'type':order_type}
+        params.update(kwargs)
+        return self._Request('post', '/orders', data=json.dumps(params))
+    def zlecenie_limit(self, product_id, side, price, size, client_oid=None, stp=None, time_in_force=None, cancel_after=None, post_only=None, overdraft_enabled=None, funding_amount=None):
+        """
+        Składanie zamówienia typu limit(jedyny dopuszczalny rodzaj zamówienia dla bota)
+        DO UZUPEŁNIENIE!!!
+        """
+        params={'product_id':product_id, 'side':side, 'order_type':'limit', 'price':price, 'size':size, 'client_oid':client_oid, 'stp':stp, 'time_in_force':time_in_force, 'cancal_after':cancel_after, 'post_only':post_only, 'overdraft_enabled':overdraft_enabled, 'funding_amount':funding_amount}
+        params=dict((a, b) for a, b in params.items() if b is not None)
+        return self.zlecenie(**params)
 class Requester():
     def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')

@@ -98,6 +98,30 @@ class Private_Requester(Public_Requester):
         jw tylko dla wielu
         """
         return self.get_konto('')
+    def zlecenie(self, product_id, side, order_type, **kwargs):
+        """
+        Składanie zamówienia. główny konstruktor wszystkie rodzaje zamówień składane są tutaj po czym przechodzą do innej klasy gdzie są wysyłane
+
+        Wejście:
+                produkty (str): para produktów na której składamy zamówienie[BTC-EUR]
+                side (str): 'buy'/'sell'
+        DO UZUPEŁNIENIE!!!
+        """
+        params={'product_id':product_id, 'side':side, 'type':order_type}
+        params.update(kwargs)
+        return self._Request('post', '/orders', data=json.dumps(params))
+    def zlecenie_limit(self, product_id, side, price, size, client_oid=None, stp=None, time_in_force=None, cancel_after=None, post_only=None, overdraft_enabled=None, funding_amount=None):
+        """
+        Składanie zamówienia typu limit(jedyny dopuszczalny rodzaj zamówienia dla bota)
+        DO UZUPEŁNIENIE!!!
+        """
+        params={'product_id':product_id, 'side':side, 'order_type':'limit', 'price':price, 'size':size, 'client_oid':client_oid, 'stp':stp, 'time_in_force':time_in_force, 'cancal_after':cancel_after, 'post_only':post_only, 'overdraft_enabled':overdraft_enabled, 'funding_amount':funding_amount}
+        params=dict((a, b) for a, b in params.items() if b is not None)
+        return self.zlecenie(**params)
+        
+
+                
+    
         
 P_Re=Public_Requester(url='https://api-public.sandbox.pro.coinbase.com')
 respond=P_Re.Produkty()
@@ -105,3 +129,6 @@ print(json.dumps(respond, indent=4))
 pr=Private_Requester(api_key, secret_key, passphrase, url='https://api-public.sandbox.pro.coinbase.com')
 a=pr.get_konta()
 print(json.dumps(a, indent=4))
+
+c=pr.zlecenie_limit('ZRX-EUR', 'sell', 1.1, 12)
+print(json.dumps(c, indent=4))
