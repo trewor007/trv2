@@ -127,6 +127,64 @@ class Public_Requester():
         Lista możliwych par walutowych
         """
         return self._Request('get','/products')
+    def Historic_rates_divider(self, start, end, skala, produkt):
+        """
+        Rozdziela pobieranie danych historycznych dla pojedyńczego produktu na mniejsze kawałki (max 300 świeczek) 
+        po czym łączy zebrane dane i zwraca je jako pojedyńczy większy zbiór danych
+
+        Wejście:
+                start (float): początek przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                end (float): koniec przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                skala (int): rama czasowa pojedyńczej świeczki
+                produkt (str): nazwa wyszukiwanego produktu (BTC-EUR)
+        Wyjście:
+                lista list [czas w formacie epoch, najniższa cena, najwyższa cena, cena otwarcia, cena zamknięcia, wolumen]
+        """
+        if (int(end)-int(start)) > (300*int(skala)):
+            end_tmp=end
+            end=start+(300*skala)
+            k=self.Historic_rates(start, end, skala, produkt)
+            while end < end_tmp:
+                start=end
+                end=start+(300*skala)
+                k=(k+self.Historic_rates(start, end, skala, produkt))
+                time.sleep(0.4)
+            else:
+                end=end_tmp
+                k=(k+self.Historic_rates(start, end, skala, produkt))
+                return k                
+        else:   
+                k=self.Historic_rates(start, end, skala, produkt)
+                return k
+    def Historic_rates(self, start, end, skala, produkt):
+        """
+        Pobiera dane historyczne dla pojedyńczego produktu w formie świeczek(max 300 pozycji)
+
+        Wejście:
+                start (float): początek przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                end (float): koniec przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                skala (int): rama czasowa pojedyńczej świeczki
+                produkt (str): nazwa wyszukiwanego produktu (BTC-EUR)
+        Wyjście:
+                lista list [czas w formacie epoch, najniższa cena, najwyższa cena, cena otwarcia, cena zamknięcia, wolumen]
+        """
+        parametry={}
+        start=datetime.datetime.fromtimestamp(start).isoformat()
+        end=datetime.datetime.fromtimestamp(end).isoformat()
+        print(start, end)
+        if start is not None:
+            parametry['start'] = start
+        if end is not None:
+            parametry['end'] = end
+        if skala is not None:
+            dozwolona_skala=[60, 300, 900, 3600, 21600, 86400]
+            if skala not in dozwolona_skala:
+                nowa_skala = min(dozwolona_skala, key=lambda x:abs(x-skala))
+                print('{} Wartosc {} dla skali niedozwolona, uzyto wartosci {}'.format(time.ctime(), skala, nowa_skala))
+                skala = nowa_skala
+            parametry['granularity']= skala
+        print(parametry)
+        return self._Request('GET','/products/{}/candles'.format(str(produkt)), params=parametry)
     def _Request(self, method ,endpoint, params=None, data=None):
         """
         Wysyła zapytanie do strony. Po dojściu do tego momentu nastąpi wyjście z klasy
@@ -186,7 +244,7 @@ class Private_Requester(Public_Requester):
         params={'product_id':product_id, 'side':side, 'order_type':'limit', 'price':price, 'size':size, 'client_oid':client_oid, 'stp':stp, 'time_in_force':time_in_force, 'cancal_after':cancel_after, 'post_only':post_only, 'overdraft_enabled':overdraft_enabled, 'funding_amount':funding_amount}
         params=dict((a, b) for a, b in params.items() if b is not None)
         return self.zlecenie(**params)
-class Requester():
+#class Requester():
     def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
         self.url = url.rstrip('/')
         self.timeout = timeout
@@ -197,20 +255,28 @@ class Requester():
     def _get(self, path, params= None, ):
         respond= requests.get(self.url + path, params=params, timeout=self.timeout).json()
         return respond
-    def Historic_rates_divider(self, x=300):
-        if self.end-self.start > x*self.skala:
-            self.end_tmp=self.end
-            self.end=self.start+(x*self.skala)
-            self.Historic_rates()
-            while self.end < self.end_tmp:
-                self.start=self.end
-                self.end=self.start+(x*self.skala)
-                self.Historic_rates()
+    def Historic_rates_divider(self, start, end, skala, produkt):        
+        if (int(end)-int(start)) > (300*int(skala)):
+            end_tmp=end
+            end=start+(300*skala)
+            print('a')
+            k=self.Historic_rates(start, end, skala, produkt)
+            print(len(k))
+            while end < end_tmp:
+                start=end
+                end=start+(300*skala)
+                print('b')
+                k=(k+self.Historic_rates(start, end, skala, produkt))
+                print(len(k))
+                time.sleep(0.4)
             else:
-                self.end=self.end_tmp
-                self.Historic_rates()
-        else:
-                self.Historic_rates()
+                end=end_tmp
+                k=(k+self.Historic_rates(start, end, skala, produkt))
+                return k
+                
+        else:   
+                k=self.Historic_rates(start, end, skala, produkt)
+                return k
     def Historic_rates(self):
         parametry={}
         start=datetime.datetime.fromtimestamp(self.start)
