@@ -1,3 +1,6 @@
+# This Python file uses the following encoding: utf-8
+
+import platform
 import time
 import datetime
 import json
@@ -8,14 +11,23 @@ import urllib.request
 import requests
 import queue
 import os
-
+import copy
+import hmac
+import hashlib
+import base64
+import matplotlib.pyplot as plt
 import numpy as np
 import threading as Thread
+from requests.auth import AuthBase
+from hashtag_generator import gdax_sandbox_key, gdax_sandbox_API_secret, gdax_sandbox_phassphrase
 from websocket import create_connection, WebSocketConnectionClosedException
 
 conn=sqlite3.connect('bazadanych.db')
 c = conn.cursor()
 q = queue.Queue()
+api_key=gdax_sandbox_key
+secret_key=gdax_sandbox_API_secret
+passphrase=gdax_sandbox_phassphrase
 
 class MyWebsocket(object):
 
@@ -36,7 +48,7 @@ class MyWebsocket(object):
 
         self.stop=False
         self.on_open()
-        self.thread=Thread.Thread(target=_go)
+        self.thread=Thread.Thread(target=_go, name='Websocket')
         self.thread.start()
 
     def _connect(self):
@@ -77,58 +89,169 @@ class MyWebsocket(object):
         if self.should_print:
             print("\n-- Socket Closed --")            
     def on_error(self, e):
-        with open('error.txt','a') as txt_file:
+        print(e)
+        with open('error_run_forever.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
+        
+        webs=MyWebsocket(produkty=produkty)
+        webs.start() 
+class CBProAuth(AuthBase):
+    def __init__(self, api_key, secret_key, passphrase):
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.passphrase = passphrase
 
-class Requester():
-    def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None, bd_bot=None ):
+    def __call__(self, request):
+        timestamp = str(time.time())
+        message = ''.join([timestamp, request.method, request.path_url, (request.body or '')])
+        request.headers.update(get_auth_headers(timestamp, message, self.api_key, self.secret_key, self.passphrase))
+        return request
+def get_auth_headers(timestamp, message, api_key, secret_key, passphrase):
+    message = message.encode('ascii')
+    hmac_key = base64.b64decode(secret_key)
+    signature = hmac.new(hmac_key, message, hashlib.sha256)
+    signature_b64 = base64.b64encode(signature.digest()).decode('utf-8')
+    return {'Content-Type': 'Application/JSON', 'CB-ACCESS-SIGN': signature_b64, 'CB-ACCESS-TIMESTAMP': timestamp, 'CB-ACCESS-KEY': api_key, 'CB-ACCESS-PASSPHRASE': passphrase}
+class Public_Requester():
+    """
+    Wszystkie zapytania niewymagające logowanie przesyłane są tą klasą
+    """
+    def __init__(self, url='https://api.pro.coinbase.com', timeout=30, produkty='BTC-EUR', start=None, end=None, skala=None):
         self.url = url.rstrip('/')
+        self.auth = None
+        self.session = requests.Session()
         self.timeout = timeout
-        self.produkty= produkty
-        self.skala=skala
-        self.start=start
-        self.end=end
-    def _get(self, path, params= None, ):
-        r= requests.get(self.url + path, params=params, timeout=self.timeout).json()
-        self.Printer(r)
-    def Historic_rates_divider(self, x=300):
-        if self.end-self.start > x*self.skala:
-            self.end_tmp=self.end
-            self.end=self.start+(x*self.skala)
-            self.Historic_rates()
-            while self.end < self.end_tmp:
-                self.start=self.end
-                self.end=self.start+(x*self.skala)
-                self.Historic_rates()
+        self.produkty= produkty # uwaga! zamiennie używane z product_id. kandydat do usunięcia
+        self.skala=skala        # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
+        self.start=start        # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
+        self.end=end            # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
+
+    def Produkty(self):
+        """
+        Lista możliwych par walutowych
+        """
+        return self._Request('get','/products')
+    def Czas(self):
+        """
+        Podaje aktualny czas na serwerze    
+        """
+        return self._Request('get', '/time')
+    def Historic_rates_divider(self, start, end, skala, produkt):
+        """
+        Rozdziela pobieranie danych historycznych dla pojedyńczego produktu na mniejsze kawałki (max 300 świeczek) 
+        po czym łączy zebrane dane i zwraca je jako pojedyńczy większy zbiór danych
+
+        Wejście:
+                start (float): początek przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                end (float): koniec przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                skala (int): rama czasowa pojedyńczej świeczki
+                produkt (str): nazwa wyszukiwanego produktu (BTC-EUR)
+        Wyjście:
+                lista list [czas w formacie epoch, najniższa cena, najwyższa cena, cena otwarcia, cena zamknięcia, wolumen]
+        """
+        if (int(end)-int(start)) > (300*int(skala)):
+            end_tmp=end
+            end=start+(300*skala)
+            k=self.Historic_rates(start, end, skala, produkt)
+            while end < end_tmp:
+                start=end
+                end=start+(300*skala)
+                k=(k+self.Historic_rates(start, end, skala, produkt))
+                time.sleep(0.4)
             else:
-                self.end=self.end_tmp
-                self.Historic_rates()
-        else:
-                self.Historic_rates()
-    def Historic_rates(self):
+                end=end_tmp
+                k=(k+self.Historic_rates(start, end, skala, produkt))
+                return k                
+        else:   
+                k=self.Historic_rates(start, end, skala, produkt)
+                return k
+    def Historic_rates(self, start, end, skala, produkt):
+        """
+        Pobiera dane historyczne dla pojedyńczego produktu w formie świeczek(max 300 pozycji)
+
+        Wejście:
+                start (float): początek przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                end (float): koniec przedziału czasowego z którego mają zostać pobrane dane w formacie epoch
+                skala (int): rama czasowa pojedyńczej świeczki
+                produkt (str): nazwa wyszukiwanego produktu (BTC-EUR)
+        Wyjście:
+                lista list [czas w formacie epoch, najniższa cena, najwyższa cena, cena otwarcia, cena zamknięcia, wolumen]
+        """
         parametry={}
-        start=datetime.datetime.fromtimestamp(self.start)
-        print(start)
-        end=datetime.datetime.fromtimestamp(self.end)
-        print(end)
+        start=datetime.datetime.fromtimestamp(start).isoformat()
+        end=datetime.datetime.fromtimestamp(end).isoformat()
         if start is not None:
             parametry['start'] = start
         if end is not None:
             parametry['end'] = end
-        if self.skala is not None:
+        if skala is not None:
             dozwolona_skala=[60, 300, 900, 3600, 21600, 86400]
-            if self.skala not in dozwolona_skala:
-                nowa_skala = min(dozwolona_skala, key=lambda x:abs(x-self.skala))
+            if skala not in dozwolona_skala:
+                nowa_skala = min(dozwolona_skala, key=lambda x:abs(x-skala))
                 print('{} Wartosc {} dla skali niedozwolona, uzyto wartosci {}'.format(time.ctime(), skala, nowa_skala))
-                self.skala = nowa_skala
-            parametry['granularity']= self.skala
-        self._get('/products/{}/candles'.format(str(self.produkty[0])), params=parametry)
-    def Printer(self, r=None):
-        i=0
-        while i < len(r):
-            c.execute("INSERT INTO Candles(product_id, time, low, high, open, close, volume) VALUES(?,?,?,?,?,?,?)", (self.produkty[0], r[i][0], r[i][1], r[i][2], r[i][3], r[i][4], r[i][5]))
-            i=i+1
-        conn.commit()
+                skala = nowa_skala
+            parametry['granularity']= skala
+        return self._Request('GET','/products/{}/candles'.format(str(produkt)), params=parametry)
+    def _Request(self, method ,endpoint, params=None, data=None):
+        """
+        Wysyła zapytanie do strony. Po dojściu do tego momentu nastąpi wyjście z klasy
+
+            Wejście:
+                    method (str):   Metoda HTTP (get, post, delete)
+                    endpoint (str): końcówka adresu HTTP odpowiednia do zapytania
+                    params (dict):  dodatkowe parametry do zapytania HTTP (opcionalne)
+                    data (str):     parametry w formacie JSON do zapytania HTTP typu POST (opcionalne)
+            Wyjście:
+                    odpowiedz w formacie JSON (list/dict)
+        """
+        url=self.url+endpoint
+        r=self.session.request(method, url, params=params, data=data, auth=self.auth, timeout=30)
+        #print(r.text)
+        return r.json() 
+class Private_Requester(Public_Requester):
+    """
+    Wszystkie zapytania po zalogowaniu przesyłane są tą klasą(jeżeli w nawiasie powyżej jest "Public_Pequester" to zapytania z tej klasy są obsługiwane przez _Requester z tamtej klasy
+    """
+    def __init__(self, api_key, secret_key, passphrase, url='https://api.pro.coinbase.com'):
+        super(Private_Requester, self).__init__(url)
+        self.auth=CBProAuth(api_key, secret_key, passphrase)
+        self.session=requests.session()
+    def get_konto(self, account_id):
+        """
+        Pobiera informacje na temat pojedyńczego konta
+
+        Wejście:
+                account_id (str): nazwa poszukiwanego konta
+        Wyjście:
+                Dane konta (dict)
+        """
+        return self._Request('get','/accounts/'+account_id)
+
+    def get_konta(self):
+        """
+        jw tylko dla wielu
+        """
+        return self.get_konto('')
+    def zlecenie(self, product_id, side, order_type, **kwargs):
+        """
+        Składanie zamówienia. główny konstruktor wszystkie rodzaje zamówień składane są tutaj po czym przechodzą do innej klasy gdzie są wysyłane
+
+        Wejście:
+                produkty (str): para produktów na której składamy zamówienie[BTC-EUR]
+                side (str): 'buy'/'sell'
+        DO UZUPEŁNIENIE!!!
+        """
+        params={'product_id':product_id, 'side':side, 'type':order_type}
+        params.update(kwargs)
+        return self._Request('post', '/orders', data=json.dumps(params))
+    def zlecenie_limit(self, product_id, side, price, size, client_oid=None, stp=None, time_in_force=None, cancel_after=None, post_only=None, overdraft_enabled=None, funding_amount=None):
+        """
+        Składanie zamówienia typu limit(jedyny dopuszczalny rodzaj zamówienia dla bota)
+        DO UZUPEŁNIENIE!!!
+        """
+        params={'product_id':product_id, 'side':side, 'order_type':'limit', 'price':price, 'size':size, 'client_oid':client_oid, 'stp':stp, 'time_in_force':time_in_force, 'cancal_after':cancel_after, 'post_only':post_only, 'overdraft_enabled':overdraft_enabled, 'funding_amount':funding_amount}
+        params=dict((a, b) for a, b in params.items() if b is not None)
+        return self.zlecenie(**params)
 class StockIndicators():
     def SI_sma(self, cena, zakres):
         self.cena=cena
@@ -170,116 +293,205 @@ class StockIndicators():
             return rsi[-1]
         else:
             return 50 
+class Rules():
+    def SMA_EMA(self, produkt_id, zakres, cena, smas_budget, smas_budget2, ema_budget, ema_budget2, smas, rsi, ema, wallet):
+        smas=Si.SI_sma(cena=cena, zakres=zakres[0])             
+        rsi=Si.SI_RSI(cena=cena)
+        print("===========================================================")
+        print("Pair: {} Rsi: {}. Cena Size: {}".format(pair, rsi, len(cena)))
+        if ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and (smas_budget["kupiono"]==True) and (smas_budget["BuyPrice"]<cena[-1])): #sprzedawanie
+            smas_budget["kupiono"]=False       
+            wallet[pair[4:]]=round(wallet[pair[4:]]+(smas_budget['coin_amount']*cena[-1]),2)
+            wallet[pair[:3]]=round(wallet[pair[:3]]-(smas_budget['coin_amount']),7)
+            smas_budget["Sentence"]=("SMAS_S {} {}@ P: {}  BP: {} ".format(smas_budget["coin_amount"],pair[:3],cena[-1],smas_budget['BuyPrice']))
+            smas_budget["coin_amount"]=float(0)
+            smas_budget['BuyPrice']=float(0)
+        elif ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and (rsi<30) and (smas_budget2["kupiono"]==True) and (smas_budget2["BuyPrice"]<cena[-1])): #sprzedawanie rsi
+            smas_budget2["kupiono"]=False
+            wallet[pair[4:]]=round(wallet[pair[4:]]+(smas_budget2['coin_amount']*cena[-1]),2)
+            wallet[pair[:3]]=round(wallet[pair[:3]]-(smas_budget2['coin_amount']),7)
+            smas_budget2["Sentence"]=("SMAS_S RSI {} {}@ P: {} BP: {}".format(smas_budget2["coin_amount"],pair[:3],cena[-1],smas_budget2['BuyPrice']))
+            smas_budget2["coin_amount"]=float(0)
+            smas_budget2['BuyPrice']=float(0)
+        elif ((cena[-1]<smas[-1]) and (cena[-1]>cena[-2]) and (smas_budget["kupiono"]==False) and wallet[pair[4:]]>int(0)): #kupowanie
+            smas_budget["kupiono"]=True
+            smas_budget["BuyPrice"]=cena[-1]
+            smas_budget['coin_amount']=round(((0.1*wallet[pair[4:]])/cena[-1]),7)
+            wallet[pair[4:]]=round(wallet[pair[4:]]-(smas_budget['coin_amount']*cena[-1]),7)
+            wallet[pair[:3]]=round(wallet[pair[:3]]+(smas_budget['coin_amount']),7)
+            smas_budget["Sentence"]=("SMAS_B {} {}@ P: {}".format(smas_budget["coin_amount"],pair[:3],cena[-1]))
+        elif ((cena[-1]<smas[-1]) and (cena[-1]>cena[-2]) and (rsi>70) and (smas_budget2["kupiono"]==False) and wallet[pair[4:]]>int(0)): #kupowanie rsi
+            smas_budget2["kupiono"]=True
+            smas_budget2["BuyPrice"]=cena[-1]
+            smas_budget2['coin_amount']=round(((0.1*wallet[pair[4:]])/cena[-1]),7)
+            wallet[pair[4:]]=round(wallet[pair[4:]]-(smas_budget2['coin_amount']*cena[-1]),7)
+            wallet[pair[:3]]=round(wallet[pair[:3]]+(smas_budget2['coin_amount']),7)
+            smas_budget2["Sentence"]=("SMAS_B RSI  {} {}@ P: {}".format(smas_budget2["coin_amount"],pair[:3],cena[-1]))
+        else:
+            pass
+        for i in zakres:
+            if len(cena)>i:
+                j=zakres.index(i)
+                ema[j]=Si.SI_ema(cena=cena, zakres=i)
+                if ((cena[-1]>ema[j][-1]) and (cena[-1]<cena[-2]) and (ema_budget[j]["kupiono"]==True) and (ema_budget[j]["BuyPrice"]<cena[-1])): #sprzedawanie
+                    ema_budget[j]["kupiono"]=False
+                    wallet[pair[4:]]=round(wallet[pair[4:]]+(ema_budget[j]['coin_amount']*cena[-1]),2)
+                    wallet[pair[:3]]=round(wallet[pair[:3]]-(ema_budget[j]['coin_amount']),7)
+                    ema_budget[j]["Sentence"]=("EMA{}_S {} {}@ P: {}  BP: {} ".format((j+1),ema_budget[j]["coin_amount"],pair[:3],cena[-1],ema_budget[j]['BuyPrice']))
+                    ema_budget[j]["coin_amount"]=float(0)
+                    ema_budget[j]['BuyPrice']=float(0)
+                elif ((cena[-1]>ema[j][-1]) and (cena[-1]<cena[-2]) and (rsi<30) and (ema_budget2[j]["kupiono"]==True) and (ema_budget2[j]["BuyPrice"]<cena[-1])): #sprzedawanie rsi
+                    ema_budget2[j]["kupiono"]=False
+                    wallet[pair[4:]]=round(wallet[pair[4:]]+(ema_budget2[j]['coin_amount']*cena[-1]),2)
+                    wallet[pair[:3]]=round(wallet[pair[:3]]-(ema_budget2[j]['coin_amount']),7)
+                    ema_budget2[j]["Sentence"]=("EMA{}_S RSI {} {}@ P: {}  BP: {} ".format((j+1),ema_budget2[j]["coin_amount"],pair[:3],cena[-1],ema_budget2[j]['BuyPrice']))
+                    ema_budget2[j]["coin_amount"]=float(0)
+                    ema_budget2[j]['BuyPrice']=float(0)
+                elif ((cena[-1]<ema[j][-1]) and (cena[-1]>cena[-2]) and (ema_budget[j]["kupiono"]==False)  and wallet[pair[4:]]>int(0)): #buing
+                    ema_budget[j]["kupiono"]=True
+                    ema_budget[j]["BuyPrice"]=cena[-1]
+                    ema_budget[j]['coin_amount']=round(((0.1*wallet[pair[4:]])/cena[-1]),7)
+                    wallet[pair[4:]]=round(wallet[pair[4:]]-(ema_budget[j]['coin_amount']*cena[-1]),7)
+                    wallet[pair[:3]]=round(wallet[pair[:3]]+(ema_budget[j]['coin_amount']),7)
+                    ema_budget[j]["Sentence"]=("EMA{}_B {} {}@ P: {}".format((j+1),ema_budget[j]["coin_amount"],pair[:3],cena[-1]))
+                elif ((cena[-1]<ema[j][-1]) and (cena[-1]>cena[-2]) and (rsi>70) and (ema_budget2[j]["kupiono"]==False)  and wallet[pair[4:]]>int(0)): #kupowanie rsi
+                    ema_budget2[j]["kupiono"]=True
+                    ema_budget2[j]["BuyPrice"]=cena[-1]
+                    ema_budget2[j]['coin_amount']=round(((0.15*wallet[pair[4:]])/cena[-1]),7)
+                    wallet[pair[4:]]=round(wallet[pair[4:]]-(ema_budget2[j]['coin_amount']*cena[-1]),7)
+                    wallet[pair[:3]]=round(wallet[pair[:3]]+(ema_budget2[j]['coin_amount']),7)
+                    ema_budget2[j]["Sentence"]=("EMA{}_BUY RSI  {} {}@ P: {}".format((j+1),ema_budget2[j]["coin_amount"],pair[:3],cena[-1]))
+                else:
+                    pass 
+        return smas_budget, smas_budget2, ema_budget, ema_budget2, smas, rsi, ema, wallet         
+def Preignitor():
+    end=(time.time())
+    start=end-1800#86400
+    for product_id in produkty:
+        PR=Public_Requester()
+        un_filtered=PR.Historic_rates_divider(start=start, end=end, skala=900, produkt=product_id)
+        time.sleep(1)
+        for v in range(len(un_filtered)):
+            cena[produkty.index(product_id)].append(un_filtered[v][4])
+            czas[produkty.index(product_id)].append(un_filtered[v][0])
+def Preignitor_plot(produkty, cena, czas):
+    fig=plt.figure()
+    for x in range(len(produkty)):
+        ax[x]=fig.add_subplot(len(produkty), 1 , 1+x)
+        p[x], =ax[x].plot(czas[x], cena[x])
+    plt.show(block=False)
+def Plot_update(cena, czas, x):
+    p[x].set_data(czas,cena)
+    ax[x].relim()
+    ax[x].autoscale_view()
+    plt.pause(1e-3)            
 def clear():
     os.system('cls')
-smas_budget=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema_budget=     [{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}]
-smas_budget2=    {"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}
-ema_budget2=     [{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0},{"1coin":int(0),"2coin":int(50), "kupiono": False, "BuyPrice":0}]
-ema=[[],[],[],[]]
+def Wallets():
+    global produkty
+    PR=Public_Requester()
+    produkty_Crypto=[]
+    produkty_Fiat=[]
+    produkty=PR.Produkty()
+    produkty[:] = [d for d in produkty if d.get('quote_currency') != 'USD']
+    produkty[:] = [d for d in produkty if d.get('quote_currency') != 'GBP']
+    produkty_Crypto[:] = [d for d in produkty if d.get('quote_currency') == 'BTC']
+    produkty_Fiat[:] = [d for d in produkty if d.get('quote_currency') == 'EUR']
+    produkty_Fiat[:] = produkty_Fiat[:]+[d for d in produkty if d.get('quote_currency') == 'USDC']
+    a=int(input("[1 EUR][2 BTC]"))
+    if a==1:
+        produkty=[d['id'] for d in produkty_Fiat]
+    elif a==2:
+        produkty=[d['id'] for d in produkty_Crypto]
+    print(produkty)
+    return produkty
+ 
+produkty=["BTC-EUR", "ETH-EUR", "ETC-EUR", "LTC-EUR", "BCH-EUR", "ZRX-EUR"]   
+produkty=['ETH-BTC']
+#Wallets()
 b=False
-cena=[]
-czas=[]
-smas=[]
 zakres=[10, 20, 40, 80]
 
 Si=StockIndicators()
-print("Podaj pare walut ktore chcesz wykorzystac")
-a=int(input("[1 BTC-EUR] [2 LTC-EUR] [3 LTC-BTC] [4 ETH-EUR] [5 ETH-BTC] [6 BCH-BTC] [7 BCH-EUR]"))
-if a==1:
-    produkty=["BTC-EUR"]
-elif a==2:
-    produkty=["LTC-EUR"]
-elif a==3:
-    produkty=["LTC-BTC"]
-elif a==4:
-    produkty=["ETH-EUR"]
-elif a==5:
-    produkty=["ETH-BTC"]
-elif a==6:
-    produkty=["BCH-BTC"]
-elif a==7:
-    produkty=["BCH-EUR"]
 
+wallet={'EUR':float(200),'BTC':float(0.01),'ETH':float(0),'ETC':float(0),'LTC':float(0),'BCH':float(0), 'ZRX':float(0), 'USDC':float(0)}
+cena=[[] for _ in range(len(produkty))]
+czas=[[] for _ in range(len(produkty))]
+smas=[[] for _ in range(len(produkty))]
+rsi= [[] for _ in range(len(produkty))]
+ax=[[] for _ in range(len(produkty))]
+p=[[] for _ in range(len(produkty))]
+ema= [[] for _ in range(len(zakres))]
+ema= [copy.deepcopy(ema) for _ in range(len(produkty))]
+smas_budget=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
+smas_budget2=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
+ema_zakres=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
+ema_zakres2=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
+ema_budget=[copy.deepcopy(ema_zakres) for _ in range(len(produkty))]
+ema_budget2=[copy.deepcopy(ema_zakres2) for _ in range(len(produkty))]
+# with open("datadump.txt", "a") as myfile:
+#     myfile.write("time befor preignitor {}" .format(time.time()))
+
+Preignitor()
+
+
+# with open("datadump.txt", "a") as myfile:
+#     myfile.write("[{},{}]".format(czas[0], cena[0]))
+
+if platform.system() == 'Windows':
+    Preignitor_plot(produkty=produkty, cena=cena, czas=czas)
 webs=MyWebsocket(produkty=produkty)
-webs.start()  
+webs.start()
+for x in range(len(produkty)):
+    cena[x]=cena[x][::-1]
+    czas[x]=czas[x][::-1]
+
+# with open("datadump.txt", "a") as myfile:
+#     myfile.write("switching to websocket")
 while True:
     if q.not_empty:            
         dane=q.get()        
         typ=dane.get('type',None)
         if typ=='ticker':
             price=dane.get('price', None)
-            t=dane.get('time', None)
-            b=True
+            pair=dane.get('product_id',None)
+            t=dane.get('time', None)            
+            if t is not None:
+                t=time.mktime(time.strptime(t, '%Y-%m-%dT%H:%M:%S.%fZ'))
+                b=True
     if b==True:
         alfa=time.time()
         b=False
-        cena.append(float(price))
-        #czas.append(t)
-        if len(cena)>zakres[0]:
-            clear()
-            smas=Si.SI_sma(cena=cena, zakres=zakres[0])                 
-            rsi=Si.SI_RSI(cena=cena)
-            print("===========================================================")
-            print("Rsi: {}. Cena Size: {}".format(rsi, len(cena)))
-            if ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and (smas_budget["kupiono"]==True) and (smas_budget["BuyPrice"]<cena[-1])): #sprzedawanie
-                smas_budget["kupiono"]=False       
-                smas_budget["2coin"]=round((smas_budget["1coin"]*cena[-1]),2)
-                smas_budget["1coin"]=float(0)
-                print("SMAS_SELL          @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget["1coin"],smas_budget["2coin"]))
-            elif ((cena[-1]>smas[-1]) and (cena[-1]<cena[-2]) and (rsi<30) and (smas_budget2["kupiono"]==True) and (smas_budget2["BuyPrice"]<cena[-1])): #sprzedawanie rsi
-                smas_budget2["kupiono"]=False
-                smas_budget2["2coin"]=round((smas_budget2["1coin"]*cena[-1]),2)
-                smas_budget2["1coin"]=float(0)
-                print("SMAS_SELL RSI       @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget2["1coin"],smas_budget2["2coin"]))
-            elif ((cena[-1]<smas[-1]) and (cena[-1]>cena[-2]) and (smas_budget["kupiono"]==False) ): #kupowanie
-                smas_budget["kupiono"]=True
-                smas_budget["BuyPrice"]=cena[-1]
-                smas_budget["1coin"]=round((smas_budget["2coin"]/cena[-1]),7)
-                smas_budget["2coin"]=float(0)
-                print("SMAS_BUY           @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget2["1coin"],smas_budget2["2coin"]))
-            elif ((cena[-1]<smas[-1]) and (cena[-1]>cena[-2]) and (rsi>70) and (smas_budget2["kupiono"]==False) ): #kupowanie rsi
-                smas_budget2["kupiono"]=True
-                smas_budget2["BuyPrice"]=cena[-1]
-                smas_budget2["1coin"]=round((smas_budget2["2coin"]/cena[-1]),7)
-                smas_budget2["2coin"]=float(0)
-                print("SMAS_BUY     RSI   @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format(cena[-1],smas_budget["1coin"],smas_budget["2coin"]))
-            else:
-                print("SMAS_PASS                      budget  {:.7f} 1coin.   {} 2coin".format(smas_budget["1coin"],smas_budget["2coin"]))
-                print("SMAS_PASS    RSI               budget  {:.7f} 1coin.   {} 2coin".format(smas_budget2["1coin"],smas_budget2["2coin"]))
-            for i in zakres:                
-                if len(cena)>i:
-                    j=zakres.index(i)
-                    e=Si.SI_ema(cena=cena, zakres=i)
-                    k=e.tolist()
-                    ema[j].append(k[-1])
-                    if ((cena[-1]>ema[j][-1]) and (cena[-1]<cena[-2]) and (ema_budget[j]["kupiono"]==True) and (ema_budget[j]["BuyPrice"]<cena[-1])): #sprzedawanie
-                        ema_budget[j]["kupiono"]=False
-                        ema_budget[j]["2coin"]=round((ema_budget[j]["1coin"]*cena[-1]),2)
-                        ema_budget[j]["1coin"]=float(0)
-                        print("EMA{}_SELL          @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                    elif ((cena[-1]>ema[j][-1]) and (cena[-1]<cena[-2]) and (rsi<30) and (ema_budget2[j]["kupiono"]==True) and (ema_budget2[j]["BuyPrice"]<cena[-1])): #sprzedawanie rsi
-                        ema_budget2[j]["kupiono"]=False
-                        ema_budget2[j]["2coin"]=round((ema_budget2[j]["1coin"]*cena[-1]),2)
-                        ema_budget2[j]["1coin"]=float(0)
-                        print("EMA{}_SELL  RSI     @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                    elif ((cena[-1]<ema[j][-1]) and (cena[-1]>cena[-2]) and (ema_budget[j]["kupiono"]==False) ): #kupowanie
-                        ema_budget[j]["kupiono"]=True
-                        ema_budget[j]["BuyPrice"]=cena[-1]
-                        ema_budget[j]["1coin"]=round((ema_budget[j]["2coin"]/cena[-1]),7)
-                        ema_budget[j]["2coin"]=float(0)
-                        print("EMA{}_BUY           @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                    elif ((cena[-1]<ema[j][-1]) and (cena[-1]>cena[-2]) and (rsi>70) and (ema_budget2[j]["kupiono"]==False) ): #kupowanie rsi
-                        ema_budget2[j]["kupiono"]=True
-                        ema_budget2[j]["BuyPrice"]=cena[-1]
-                        ema_budget2[j]["1coin"]=round((ema_budget2[j]["2coin"]/cena[-1]),7)
-                        ema_budget2[j]["2coin"]=float(0)
-                        print("EMA{}_BUY    RSI    @ Price {}  budget  {:.7f} 1coin.   {} 2coin".format((j+1),cena[-1],ema_budget2[j]["1coin"],ema_budget2[j]["2coin"]))
-                    else:
-                        print("EMA{}_PASS                      budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget[j]["1coin"],ema_budget[j]["2coin"]))
-                        print("EMA{}_PASS   RSI                budget  {:.7f} 1coin.   {} 2coin".format((j+1),ema_budget2[j]["1coin"],ema_budget2[j]["2coin"]))
+        produkt_id=produkty.index(pair)
+        cena[produkt_id].append(float(price))
+        czas[produkt_id].append(t)
+        # with open("datadump.txt", "a") as myfile:
+        #     myfile.write("[{},{}]".format(czas[0], cena[0]))
+        if len(cena[produkt_id])>zakres[0]:
+            Ru=Rules()
+            Ru.SMA_EMA(produkt_id=produkt_id, zakres=zakres, cena=cena[produkt_id], smas_budget=smas_budget[produkt_id], smas_budget2=smas_budget2[produkt_id], ema_budget=ema_budget[produkt_id], ema_budget2=ema_budget2[produkt_id], smas=smas[produkt_id], rsi=rsi[produkt_id], ema=ema[produkt_id], wallet=wallet)
+            for x in range(len(produkty)):
+                print(smas_budget[x]["Sentence"],smas_budget2[x]["Sentence"])               
+                for y in range(len(zakres)):
+                    print(ema_budget[x][y]["Sentence"],ema_budget2[x][y]["Sentence"])
         else:
             pass
+        if platform.system() == 'Windows':
+            Plot_update(cena=cena[produkt_id], czas=czas[produkt_id], x=produkt_id)
         beta=(time.time()-alfa)
+        if len(cena[produkt_id])>500:
+            del cena[produkt_id][0]
+        if len(czas[produkt_id])>500:
+            del czas[produkt_id][0]
+        if len(smas[produkt_id])>500:
+            del smas[produkt_id][0]
+        if len(rsi[produkt_id])>500:
+            del rsi[produkt_id][0]
+        #if len(ax[produkt_id])>500:
+        #    del ax[produkt_id][0]
+        #if len(p[produkt_id])>500:
+        #    del p[produkt_id][0]
+
         print(beta)
+        print(wallet)
 
