@@ -92,6 +92,7 @@ class MyWebsocket(object):
         print(e)
         with open('error_run_forever.txt','a') as txt_file:
             print('{} Error :{}'.format(time.ctime(), e), file=txt_file)
+        
         webs=MyWebsocket(produkty=produkty)
         webs.start() 
 class CBProAuth(AuthBase):
@@ -428,17 +429,25 @@ ema_zakres=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":No
 ema_zakres2=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
 ema_budget=[copy.deepcopy(ema_zakres) for _ in range(len(produkty))]
 ema_budget2=[copy.deepcopy(ema_zakres2) for _ in range(len(produkty))]
+# with open("datadump.txt", "a") as myfile:
+#     myfile.write("time befor preignitor {}" .format(time.time()))
 
 Preignitor()
 
+
+# with open("datadump.txt", "a") as myfile:
+#     myfile.write("[{},{}]".format(czas[0], cena[0]))
+
 if platform.system() == 'Windows':
     Preignitor_plot(produkty=produkty, cena=cena, czas=czas)
+webs=MyWebsocket(produkty=produkty)
+webs.start()
 for x in range(len(produkty)):
     cena[x]=cena[x][::-1]
     czas[x]=czas[x][::-1]
-webs=MyWebsocket(produkty=produkty)
-webs.start()
 
+# with open("datadump.txt", "a") as myfile:
+#     myfile.write("switching to websocket")
 while True:
     if q.not_empty:            
         dane=q.get()        
@@ -456,6 +465,8 @@ while True:
         produkt_id=produkty.index(pair)
         cena[produkt_id].append(float(price))
         czas[produkt_id].append(t)
+        # with open("datadump.txt", "a") as myfile:
+        #     myfile.write("[{},{}]".format(czas[0], cena[0]))
         if len(cena[produkt_id])>zakres[0]:
             Ru=Rules()
             Ru.SMA_EMA(produkt_id=produkt_id, zakres=zakres, cena=cena[produkt_id], smas_budget=smas_budget[produkt_id], smas_budget2=smas_budget2[produkt_id], ema_budget=ema_budget[produkt_id], ema_budget2=ema_budget2[produkt_id], smas=smas[produkt_id], rsi=rsi[produkt_id], ema=ema[produkt_id], wallet=wallet)
