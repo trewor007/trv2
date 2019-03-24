@@ -1,0 +1,7 @@
+exec('a=1')
+exec('b=2')
+exec('print(a)')
+exec('print(b)')
+exec('c=a+b')
+exec('print(c)')
+print(c)

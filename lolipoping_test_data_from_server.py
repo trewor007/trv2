@@ -102,7 +102,7 @@ produkty=['ETH-BTC']
 #Wallets()
 b=False
 zakres=[10, 20, 40, 80]
-skala=120
+skala=60
 
 wallet={'EUR':float(200),'BTC':float(0.01),'ETH':float(0),'ETC':float(0),'LTC':float(0),'BCH':float(0), 'ZRX':float(0), 'USDC':float(0)}
 cena=[[] for _ in range(len(produkty))]
@@ -113,10 +113,10 @@ ax=[[] for _ in range(len(produkty))]
 p=[[] for _ in range(len(produkty))]
 ema= [[] for _ in range(len(zakres))]
 ema= [copy.deepcopy(ema) for _ in range(len(produkty))]
-smas_budget=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
-smas_budget2=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
-ema_zakres=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
-ema_zakres2=[{"coin_amount":int(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
+smas_budget=[{"coin_amount":float(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
+smas_budget2=[{"coin_amount":float(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(produkty))]
+ema_zakres=[{"coin_amount":float(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
+ema_zakres2=[{"coin_amount":float(0), "kupiono": False, "BuyPrice":0, "Sentence":None} for _ in range(len(zakres))]
 ema_budget=[copy.deepcopy(ema_zakres) for _ in range(len(produkty))]
 ema_budget2=[copy.deepcopy(ema_zakres2) for _ in range(len(produkty))]
 
@@ -130,6 +130,9 @@ while True:
         if typ=='ticker':
             price=dane.get('price', None)
             pair=dane.get('product_id',None)
+            trade_volume=dane.get('last_size',None)
+            if trade_volume is not None:
+                trade_volume=float(trade_volume)
             t=dane.get('time', None)            
             if t is not None:
                 t=time.mktime(time.strptime(t, '%Y-%m-%dT%H:%M:%S.%fZ'))
@@ -140,26 +143,35 @@ while True:
         produkt_id=produkty.index(pair)
         #cena[produkt_id].append(float(price))
         if len(cena[produkt_id])==0:
-            cena[produkt_id].append([0,0,0,0,0])
-            cena[produkt_id][0][0]=time.time()  #Open Time
-            cena[produkt_id][0][1]=price        #Open Price
-            cena[produkt_id][0][2]=price        #High Price
-            cena[produkt_id][0][3]=price        #Low Price
-            cena[produkt_id][0][4]=price        #Close Price
+            cena[produkt_id].append([0,0,0,0,0,0])
+            cena[produkt_id][0][0]=time.time()                                  #Open Time
+            cena[produkt_id][0][1]=price                                        #Low Price
+            cena[produkt_id][0][2]=price                                        #High Price
+            cena[produkt_id][0][3]=price                                        #Open Price           
+            cena[produkt_id][0][4]=price                                        #Close Price
+            cena[produkt_id][0][5]=0                                            #Volume
+
         elif len(cena[produkt_id])>0:
-            if price>cena[produkt_id][-1][2]:
-                cena[produkt_id][-1][2]=price
-                cena[produkt_id][-1][4]=price
-            elif price<cena[produkt_id][-1][3]:
-                cena[produkt_id][-1][3]=price
-                cena[produkt_id][-1][4]=price
-            elif (time.time()-cena[produkt_id][-1][0])>skala:
-                cena[produkt_id].append([0,0,0,0,0])
-                cena[produkt_id][-1][0]=time.time()  #Open Time
-                cena[produkt_id][-1][1]=price        #Open Price
-                cena[produkt_id][-1][2]=price        #High Price
-                cena[produkt_id][-1][3]=price        #Low Price
-                cena[produkt_id][-1][4]=price        #Close Price
+            if (time.time()-cena[produkt_id][-1][0])>skala:                   #time for new Candle
+                cena[produkt_id].append([0,0,0,0,0,0])
+                cena[produkt_id][-1][0]=time.time()                             #Open Time
+                cena[produkt_id][-1][1]=price                                   #Low Price
+                cena[produkt_id][-1][2]=price                                   #High Price
+                cena[produkt_id][-1][3]=price                                   #Open Price           
+                cena[produkt_id][-1][4]=price                                   #Close Price
+                cena[produkt_id][-1][5]=trade_volume                            #Volume
+               
+            elif price>cena[produkt_id][-1][2]:                                 #Price is rising
+                cena[produkt_id][-1][2]=price                                   #High Price
+                cena[produkt_id][-1][4]=price                                   #Close Price
+                cena[produkt_id][-1][5]=cena[produkt_id][-1][5]+trade_volume    #Volume
+            
+            elif price<cena[produkt_id][-1][3]:                                 #price is droping
+                cena[produkt_id][-1][1]=price                                   #Low Price
+                cena[produkt_id][-1][4]=price                                   #Close Price
+                cena[produkt_id][-1][5]=cena[produkt_id][-1][5]+trade_volume    #Volume
+
             else:
-                cena[produkt_id][-1][4]=price
-            print(cena[produkt_id])
+                cena[produkt_id][-1][4]=price                                   #Close Price
+                cena[produkt_id][-1][5]=cena[produkt_id][-1][5]+trade_volume    #Volume
+            print(cena[produkt_id][-1])
