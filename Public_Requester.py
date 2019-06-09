@@ -15,7 +15,16 @@ class Public_Requester(object):
         self.skala=skala        # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
         self.start=start        # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
         self.end=end            # uwaga! Używanie jedynie przy danych historycznych. kandydat do usunięcia
-
+    def Produkty(self):
+        """
+        Lista możliwych par walutowych
+        """
+        return self._Request('get','/products')
+    def Czas(self):
+        """
+        Podaje aktualny czas na serwerze    
+        """
+        return self._Request('get', '/time')
     def Historic_rates_divider(self, start, end, skala, produkt):
         """
         Rozdziela pobieranie danych historycznych dla pojedyńczego produktu na mniejsze kawałki (max 300 świeczek) 
@@ -30,26 +39,36 @@ class Public_Requester(object):
                 lista list [czas w formacie epoch, najniższa cena, najwyższa cena, cena otwarcia, cena zamknięcia, wolumen]
         """
         runned=False
-        if (int(end)-int(start)) > (300*int(skala)):
+        if (int(end)-int(start)) > (200*int(skala)):
             runned=True
             true_end=end
-            end=start+(300*skala)
+            end=start+(200*skala)
+            if produkt[3]!='-':                              #Uodparnia program na błąd niepoprawnego znaku pomiędzy parami liczbowymi
+                produkt=produkt[0:3]+'-'+produkt[4:]
+            else:
+                pass
             k=self.Historic_rates(start, end, skala, produkt)
+            k=k[::-1]
             print("A Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
-            while end+(300*skala) < true_end:
+            while end+(200*skala) < true_end:
                 start=end
-                end=start+(300*skala)
-                k=(k+self.Historic_rates(start, end, skala, produkt))
+                end=start+(200*skala)
+                L=self.Historic_rates(start, end, skala, produkt)
+                L=L[::-1]
+                k=k+L
                 print("B Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
                 time.sleep(0.4)
             else:
                 start=end
                 end=true_end
-                k=(k+self.Historic_rates(start, end, skala, produkt))
+                L=self.Historic_rates(start, end, skala, produkt)
+                L=L[::-1]
+                k=k+L
                 print("C Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
                 return k                
         elif (runned==False):   
                 k=self.Historic_rates(start, end, skala, produkt)
+                k=k[::-1]
                 print("D Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
                 return k
     def Historic_rates(self, start, end, skala, produkt):

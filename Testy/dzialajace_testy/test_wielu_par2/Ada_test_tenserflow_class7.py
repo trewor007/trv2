@@ -60,14 +60,14 @@ class Tensorflow_Model():
         else:
             return 0
     def preprocess_Main_data_frame(self, Main_data_frame):
-        Main_data_frame=Main_data_frame.drop('future', 1)
+        Main_data_frame=Main_data_frame.drop('future', 1)    #odrzucenie danych z "przyszlosci"
 
-        for col in Main_data_frame.columns:
-            if col !='target':
-                Main_data_frame[col]=Main_data_frame[col].pct_change()
-                Main_data_frame.dropna(inplace=True)
-                Main_data_frame[col]=preprocessing.scale(Main_data_frame[col].values)
-        Main_data_frame.dropna(inplace=True)
+        for col in Main_data_frame.columns:                  #iteracja przez kazda kolumne
+            if col !='target':                               # jeśli kolumna nie nazywa sie "target"
+                Main_data_frame[col]=Main_data_frame[col].pct_change()  #.ptc_change zamienia dane na procentowa roznice pomiedzy col[n] a con[n+1] col zero staje sie NAN
+                Main_data_frame.dropna(inplace=True)                    #oczyszcza NAN z pierwszej pozycji po wykorzystaniu ptc_change
+                Main_data_frame[col]=preprocessing.scale(Main_data_frame[col].values)   #skaluje wartośći pomiędzy 0 a 1
+        Main_data_frame.dropna(inplace=True)    #oczyszczanie z NAN
         sequential_data=[]
         prev_days=deque(maxlen=self.seq_len)
         for i in Main_data_frame.values:

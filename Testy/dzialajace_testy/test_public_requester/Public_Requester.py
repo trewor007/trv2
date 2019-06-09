@@ -48,21 +48,27 @@ class Public_Requester(object):
             else:
                 pass
             k=self.Historic_rates(start, end, skala, produkt)
+            k=k[::-1]
             print("A Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
             while end+(200*skala) < true_end:
                 start=end
                 end=start+(200*skala)
-                k=(k+self.Historic_rates(start, end, skala, produkt))
+                L=self.Historic_rates(start, end, skala, produkt)
+                L=L[::-1]
+                k=k+L
                 print("B Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
                 time.sleep(0.4)
             else:
                 start=end
                 end=true_end
-                k=(k+self.Historic_rates(start, end, skala, produkt))
+                L=self.Historic_rates(start, end, skala, produkt)
+                L=L[::-1]
+                k=k+L
                 print("C Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
                 return k                
         elif (runned==False):   
                 k=self.Historic_rates(start, end, skala, produkt)
+                k=k[::-1]
                 print("D Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
                 return k
     def Historic_rates(self, start, end, skala, produkt):
