@@ -117,12 +117,11 @@ class Tensorflow_Model():
             for produkt_id in range(len(produkty)): 
                 #print(cena[produkt_id])
                 data_frame=pd.DataFrame.from_records(cena[produkt_id], columns=['time', 'low_price', 'high_price', 'open_price','close_price', 'volume'])
-
-                """                 data_frame.rename(columns={'low_price': f'{produkty[produkt_id]}_low_price',
+                data_frame.rename(columns={'low_price': f'{produkty[produkt_id]}_low_price',
                                             'high_price': f'{produkty[produkt_id]}_high_price',
                                             'open_price': f'{produkty[produkt_id]}_open_price',
                                             'close_price': f'{produkty[produkt_id]}_close_price',
-                                            'volume': f'{produkty[produkt_id]}_volume'}, inplace=True)  """
+                                            'volume': f'{produkty[produkt_id]}_volume'}, inplace=True)  
                 #if produkt_id != 0:
                 #    data_frame.drop(columns=f'{produkty[produkt_id]}_volume', inplace=True)
                 data_frame.set_index('time', inplace=True)
@@ -211,7 +210,7 @@ class Tensorflow_Model():
             model.save("models/{}.model".format(score[1]))
 def Preignitor():
 
-    end=1556372595
+    end=1567814400
     start=1546297200
     for product_id in produkty:
         PR=Public_Requester()

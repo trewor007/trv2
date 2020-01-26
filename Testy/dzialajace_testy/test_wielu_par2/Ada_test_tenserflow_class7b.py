@@ -45,7 +45,7 @@ class Tensorflow_Model():
         self.future_period_predict=3
         self.ratio_to_predict=self.produkty[0]
         self.Epochs=Epochs
-        self.BATCH_SIZE=10000
+        self.BATCH_SIZE=15000
         self.NAME='tenserflow_model'
         self.load_training_data=load_training_data
         self.load_training_model=load_training_model
@@ -117,12 +117,11 @@ class Tensorflow_Model():
             for produkt_id in range(len(produkty)): 
                 #print(cena[produkt_id])
                 data_frame=pd.DataFrame.from_records(cena[produkt_id], columns=['time', 'low_price', 'high_price', 'open_price','close_price', 'volume'])
-
-                """                 data_frame.rename(columns={'low_price': f'{produkty[produkt_id]}_low_price',
+                data_frame.rename(columns={'low_price': f'{produkty[produkt_id]}_low_price',
                                             'high_price': f'{produkty[produkt_id]}_high_price',
                                             'open_price': f'{produkty[produkt_id]}_open_price',
                                             'close_price': f'{produkty[produkt_id]}_close_price',
-                                            'volume': f'{produkty[produkt_id]}_volume'}, inplace=True)  """
+                                            'volume': f'{produkty[produkt_id]}_volume'}, inplace=True)  
                 #if produkt_id != 0:
                 #    data_frame.drop(columns=f'{produkty[produkt_id]}_volume', inplace=True)
                 data_frame.set_index('time', inplace=True)
@@ -151,13 +150,13 @@ class Tensorflow_Model():
         print("train data: {} validation {}".format(len(self.train_x), len(self.validation_x)))
         print("dont buy: {} Buys: {}".format(self.train_y.count(0), self.train_y.count(1)))
         print("VALIDATION dont buy: {} buy {}".format(self.validation_y.count(0), self.validation_y.count(1)))
-    def model(self, First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Forth_Layer_Nod, Load_From_Checkpoint):
+    def model(self, First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Load_From_Checkpoint):
         if self.load_training_model==True:   #Odczyt z zapisanego pliku modelu treningowego
             if self.multi_stage_test==True:
                 if self.Load_From_Checkpoint==True:
-                    model=load_model("models/checkpoint/1L{}_2L{}_3L{}_4L{}_{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Forth_Layer_Nod, self.loss))
+                    model=load_model("models/checkpoint/1L{}_2L{}_3L{}_{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, self.loss))
                 else:
-                    model=load_model("models/1L{}_2L{}_3L{}_4L{}_{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Forth_Layer_Nod,self.loss))
+                    model=load_model("models/1L{}_2L{}_3L{}_{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, self.loss))
             else:
                 model=load_model("model4")
         else:
@@ -166,15 +165,11 @@ class Tensorflow_Model():
             model.add(Dropout(0.1))
             model.add(BatchNormalization())
 
-            model.add(LSTM(Second_Layer_Nod, return_sequences=True))
+            model.add(LSTM(Second_Layer_Nod))
             model.add(Dropout(0.1))
             model.add(BatchNormalization())
 
-            model.add(LSTM(Third_Layer_Nod))
-            model.add(Dropout(0.2))
-            model.add(BatchNormalization())
-
-            model.add(Dense(Forth_Layer_Nod, activation='relu'))
+            model.add(Dense(Third_Layer_Nod, activation='relu'))
             model.add(Dropout(0.2))
 
             model.add(Dense(2,activation='softmax'))    
@@ -190,8 +185,8 @@ class Tensorflow_Model():
 
         model.summary()
 
-        tensorboard=TensorBoard(log_dir="models/logs/1L{}_2L{}_3L{}_4L{}_{}".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Forth_Layer_Nod, self.loss))
-        checkpoint= ModelCheckpoint("models/checkpoint/1L{}_2L{}_3L{}_4L{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Forth_Layer_Nod, monitor='val_acc', verbose=1, save_best_only=True, model='max'))
+        tensorboard=TensorBoard(log_dir="models/logs/1L{}_2L{}_3L{}_{}".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, self.loss))
+        checkpoint= ModelCheckpoint("models/checkpoint/1L{}_2L{}_3L{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, monitor='val_acc', verbose=1, save_best_only=True, model='max'))
         #train model
         model.fit(
             self.train_x, self.train_y,
@@ -206,12 +201,12 @@ class Tensorflow_Model():
         print('Test accuracy: ', score[1])
 
         if self.multi_stage_test==True:
-            model.save("models/1L{}_2L{}_3L{}_4L{}_{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Forth_Layer_Nod, self.loss))
+            model.save("models/1L{}_2L{}_3L{}_{}.model".format(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, self.loss))
         else:
             model.save("models/{}.model".format(score[1]))
 def Preignitor():
 
-    end=1556372595
+    end=1567814400
     start=1546297200
     for product_id in produkty:
         PR=Public_Requester()
@@ -219,17 +214,17 @@ def Preignitor():
         for v in range(len(un_filtered)):
             cena[produkty.index(product_id)].append(un_filtered[v])
 
-First_Layer_Nod=   15
-Second_Layer_Nod=  10
-Third_Layer_Nod=   8
-Forth_Layer_Nod=   4
+First_Layer_Nod=   5
+Second_Layer_Nod=  3
+Third_Layer_Nod=   2
+
 Loss_Models=['sparse_categorical_crossentropy']
 TFM=Tensorflow_Model(load_training_data=False, save_training_data=True, load_training_model=False,  multi_stage_test=True, Epochs=10)
 TFM.data_procesing()
 for loss in Loss_Models:
     TFM=Tensorflow_Model(load_training_data=True, save_training_data=False, load_training_model=False,  multi_stage_test=True, Epochs=500, loss=loss)
     TFM.data_procesing()
-    TFM.model(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Forth_Layer_Nod, Load_From_Checkpoint=True)
+    TFM.model(First_Layer_Nod, Second_Layer_Nod, Third_Layer_Nod, Load_From_Checkpoint=True)
     clear_session()
 
 

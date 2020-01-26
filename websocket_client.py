@@ -14,8 +14,8 @@ import time
 import os
 import threading  as Thread
 from websocket import create_connection, WebSocketConnectionClosedException
-from pymongo import MongoClient
-from cbpro_auth import get_auth_headers
+#from pymongo import MongoClient
+#from cbpro_auth import get_auth_headers
 
 
 class WebsocketClient(object):

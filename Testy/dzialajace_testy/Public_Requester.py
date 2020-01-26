@@ -78,7 +78,6 @@ class Public_Requester(object):
                 print("D Time from {} to {}".format(datetime.datetime.fromtimestamp(start).strftime('%Y-%m-%d %H:%M:%S'), datetime.datetime.fromtimestamp(end).strftime('%Y-%m-%d %H:%M:%S')))
                 time.sleep(.5)
                 return k
-        
     def Historic_rates(self, start, end, skala, produkt):
         """
         Pobiera dane historyczne dla pojedyńczego produktu w formie świeczek(max 300 pozycji)

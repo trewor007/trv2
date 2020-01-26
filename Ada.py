@@ -34,7 +34,7 @@ passphrase=gdax_sandbox_phassphrase
 
 class MyWebsocket(object):
 
-    def __init__(self, wsurl="wss://ws-feed.pro.coinbase.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}, bd_bot=1):
+    def __init__(self, wsurl="wss://ws-feed.pro.coinbase.com", dane=None, ws=None, kanaly=None, ping_start=0,produkty=['ETH-EUR', 'LTC-EUR', 'BTC-EUR'], newdict={}):
         self.wsurl = wsurl
         self.ws = None
         self.dane=dane
@@ -280,41 +280,12 @@ def Preignitor():
         for v in range(len(un_filtered)):
             cena[produkty.index(product_id)].append(un_filtered[v][4])
             czas[produkty.index(product_id)].append(un_filtered[v][0])
-def Preignitor_plot(produkty, cena, czas):
-    fig=plt.figure()
-    for x in range(len(produkty)):
-        ax[x]=fig.add_subplot(len(produkty), 1 , 1+x)
-        p[x], =ax[x].plot(czas[x], cena[x])
-    plt.show(block=False)
-def Plot_update(cena, czas, x):
-    p[x].set_data(czas,cena)
-    ax[x].relim()
-    ax[x].autoscale_view()
-    plt.pause(1e-3)            
+       
 def clear():
     os.system('cls')
-def Wallets():
-    global produkty
-    PR=Public_Requester()
-    produkty_Crypto=[]
-    produkty_Fiat=[]
-    produkty=PR.Produkty()
-    produkty[:] = [d for d in produkty if d.get('quote_currency') != 'USD']
-    produkty[:] = [d for d in produkty if d.get('quote_currency') != 'GBP']
-    produkty_Crypto[:] = [d for d in produkty if d.get('quote_currency') == 'BTC']
-    produkty_Fiat[:] = [d for d in produkty if d.get('quote_currency') == 'EUR']
-    produkty_Fiat[:] = produkty_Fiat[:]+[d for d in produkty if d.get('quote_currency') == 'USDC']
-    a=int(input("[1 EUR][2 BTC]"))
-    if a==1:
-        produkty=[d['id'] for d in produkty_Fiat]
-    elif a==2:
-        produkty=[d['id'] for d in produkty_Crypto]
-    print(produkty)
-    return produkty
- 
-produkty=["BTC-EUR", "ETH-EUR", "ETC-EUR", "LTC-EUR", "BCH-EUR", "ZRX-EUR"]   
-produkty=['ETH-BTC']
-#Wallets()
+
+produkty=['ETH-EUR']
+
 b=False
 zakres=[10, 20, 40, 80]
 
@@ -338,9 +309,7 @@ ema_budget2=[copy.deepcopy(ema_zakres2) for _ in range(len(produkty))]
 
 Preignitor()
 
-if platform.system() == 'Windows':
-    #Preignitor_plot(produkty=produkty, cena=cena, czas=czas)
-    pass
+
 for x in range(len(produkty)):
     cena[x]=cena[x][::-1]
     czas[x]=czas[x][::-1]
@@ -373,9 +342,6 @@ while True:
                     print(ema_budget[x][y]["Sentence"],ema_budget2[x][y]["Sentence"])
         else:
             pass
-        if platform.system() == 'Windows':
-            #Plot_update(cena=cena[produkt_id], czas=czas[produkt_id], x=produkt_id)
-            pass
         beta=(time.time()-alfa)
         if len(cena[produkt_id])>500:
             del cena[produkt_id][0]
@@ -385,10 +351,6 @@ while True:
             del smas[produkt_id][0]
         if len(rsi[produkt_id])>500:
             del rsi[produkt_id][0]
-        #if len(ax[produkt_id])>500:
-        #    del ax[produkt_id][0]
-        #if len(p[produkt_id])>500:
-        #    del p[produkt_id][0]
 
         print(beta)
         print(wallet)
